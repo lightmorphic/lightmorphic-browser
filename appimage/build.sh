@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-# Builds the Lightmorphic Browser AppImage by wrapping an ungoogled-chromium
-# portable Linux build (https://github.com/ungoogled-software/ungoogled-chromium-portablelinux)
-# with our extension pre-loaded. ungoogled-chromium is Chromium built from
-# source with every Google-integration patch stripped -- no Safe Browsing
-# pings, no default Google search/sync/API keys, no telemetry -- rather
-# than stock Chromium with flags papering over what's still baked in.
+# Builds the Lightmorphic Browser AppImage by wrapping an official
+# open-source Chromium build (NOT "Google Chrome" -- the snapshot archive
+# used here already lacks Google's proprietary API keys/branding, since
+# that's what distinguishes vanilla open-source Chromium from Google
+# Chrome to begin with) with our own privacy-hardening flags and prefs on
+# top, plus our extension pre-loaded.
 #
-# Usage: build.sh <release-tag>   e.g. build.sh 151.0.7922.137-1
-# The tag is ungoogled-chromium-portablelinux's own release tag (Chromium
-# version + their patch-set revision, e.g. "-1"), not a bare Chromium
-# version -- CI resolves this via that repo's own releases feed.
+# Deliberately NOT built on a third-party de-googling project
+# (ungoogled-chromium): that ties our release cadence to that project
+# continuing to exist and keep pace with upstream Chromium, which is a
+# real risk for a project we intend to keep working indefinitely. This
+# way we own the privacy hardening ourselves and it can't disappear out
+# from under us -- see AppRun below for exactly what's disabled and why.
+#
+# Usage: build.sh <chromium-version>   e.g. build.sh 131.0.6778.85
 set -euo pipefail
 
-RELEASE_TAG="${1:?usage: build.sh <ungoogled-chromium-portablelinux release tag, e.g. 151.0.7922.137-1>}"
-CHROMIUM_VERSION="${RELEASE_TAG%-*}"
+CHROMIUM_VERSION="${1:?usage: build.sh <chromium-version>}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APPDIR="$ROOT/appimage/AppDir"
 DIST="$ROOT/dist"
@@ -21,12 +24,45 @@ DIST="$ROOT/dist"
 rm -rf "$APPDIR/usr"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/lightmorphic-browser/extension" "$DIST"
 
-echo "==> Fetching ungoogled-chromium ${RELEASE_TAG} (linux64)"
-ASSET="ungoogled-chromium-${RELEASE_TAG}-x86_64_linux.tar.xz"
-curl -sL "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/releases/download/${RELEASE_TAG}/${ASSET}" \
-  -o "$ROOT/appimage/chromium.tar.xz"
-tar -xJf "$ROOT/appimage/chromium.tar.xz" -C "$APPDIR/usr/bin"
-mv "$APPDIR/usr/bin/ungoogled-chromium-${RELEASE_TAG}-x86_64_linux" "$APPDIR/usr/bin/chromium"
+echo "==> Resolving snapshot build position for Chromium ${CHROMIUM_VERSION}"
+# The Chrome versionhistory API (used by CI to find the latest stable
+# version) returns a version STRING like "131.0.6778.85". The snapshot
+# archive that hosts prebuilt linux64 binaries is indexed by an integer
+# build POSITION, not the version string, so the two have to be bridged
+# via chromiumdash's fetch_version lookup.
+POSITION=$(curl -sL "https://chromiumdash.appspot.com/fetch_version?version=${CHROMIUM_VERSION}" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['chromium_main_branch_position'])")
+echo "==> Build position: ${POSITION}"
+
+# Not every position has an archived snapshot (only positions where a bot
+# actually ran get one), so probe outward from POSITION for the nearest
+# one that exists. A GCS prefix-listing API exists but sorts entries
+# LEXICOGRAPHICALLY, which silently misorders positions of different
+# digit lengths (e.g. "165443" sorts before "1654408") -- a direct
+# existence probe avoids that trap entirely, at the cost of being O(n)
+# HTTP requests instead of one list call.
+SNAPSHOT_POSITION=""
+for offset in $(seq 0 500); do
+  for candidate in $((POSITION - offset)) $((POSITION + offset)); do
+    code=$(curl -s -o /dev/null -w "%{http_code}" --head \
+      "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/${candidate}/chrome-linux.zip")
+    if [ "$code" = "200" ]; then
+      SNAPSHOT_POSITION="$candidate"
+      break 2
+    fi
+  done
+done
+if [ -z "$SNAPSHOT_POSITION" ]; then
+  echo "==> No archived snapshot found within 500 positions of ${POSITION}" >&2
+  exit 1
+fi
+echo "==> Nearest archived snapshot: ${SNAPSHOT_POSITION} (offset $((SNAPSHOT_POSITION - POSITION)))"
+
+echo "==> Fetching Chromium ${CHROMIUM_VERSION} (linux64, position ${SNAPSHOT_POSITION})"
+curl -sL "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/${SNAPSHOT_POSITION}/chrome-linux.zip" \
+  -o "$ROOT/appimage/chrome-linux.zip"
+unzip -q -o "$ROOT/appimage/chrome-linux.zip" -d "$APPDIR/usr/bin"
+mv "$APPDIR/usr/bin/chrome-linux" "$APPDIR/usr/bin/chromium"
 
 echo "==> Bundling extension"
 cp -r "$ROOT/extension/." "$APPDIR/usr/share/lightmorphic-browser/extension/"
@@ -83,10 +119,40 @@ fi
 # restart. --disable-extensions-except pins it as an explicitly-allowed
 # extension instead, which is the combination Selenium/Puppeteer use for
 # exactly this reason.
+#
+# Privacy hardening (owned by us, not a third-party project): stock
+# open-source Chromium already lacks Google's proprietary API keys, but
+# still talks to Google for a handful of things by default. These are
+# documented, real Chromium switches -- not guessed preference keys:
+#   --disable-background-networking   stops most background Google network
+#                                      traffic (component updater pings etc.)
+#   --disable-sync                    Chrome Sync entirely off
+#   --disable-domain-reliability      stops domain-reliability monitoring
+#                                      pings (goes to Google infrastructure)
+#   --disable-client-side-phishing-detection
+#                                      stops Safe Browsing's client-side
+#                                      phishing-detection network traffic
+#   --disable-features=...            Translate (no Google Translate ping),
+#                                      OptimizationHints, AutofillServerCommunication
+#   --disable-search-engine-choice-screen
+#                                      skips the upstream search-engine
+#                                      prompt (cosmetic, not itself a privacy
+#                                      fix)
+# Known gap, documented rather than guessed at: the default search engine
+# in the prepopulated engine list is still Google (baked into the source,
+# not policy-removable without a real patch) -- changing it needs either a
+# verified Preferences key (not yet done, see docs/RUNBOOK.md) or a manual
+# one-time change by the user in Settings.
 exec "$HERE/usr/bin/chromium/chrome" \
   --load-extension="$EXT" \
   --disable-extensions-except="$EXT" \
   --user-data-dir="$USER_DATA_DIR" \
+  --disable-background-networking \
+  --disable-sync \
+  --disable-domain-reliability \
+  --disable-client-side-phishing-detection \
+  --disable-features=Translate,OptimizationHints,AutofillServerCommunication \
+  --disable-search-engine-choice-screen \
   --apps-gallery-url="https://webstore-proxy.lightmorphic.co.uk/webstore" \
   --apps-gallery-update-url="https://webstore-proxy.lightmorphic.co.uk/service/update2/crx" \
   --apps-gallery-download-url="https://webstore-proxy.lightmorphic.co.uk/crx/%s.crx" \
@@ -122,9 +188,5 @@ fi
 mv "$GENERATED" "$DIST/$FINAL_NAME"
 chmod +x "$DIST/$FINAL_NAME"
 
-# Track the full release tag (not just the Chromium version), since
-# ungoogled-chromium can ship a new patch-set revision (e.g. "-2") for
-# the same underlying Chromium version -- that's a real update CI should
-# still pick up.
-echo "$RELEASE_TAG" > "$ROOT/appimage/last-built-version.txt"
+echo "$CHROMIUM_VERSION" > "$ROOT/appimage/last-built-version.txt"
 echo "==> Done: dist/$FINAL_NAME"

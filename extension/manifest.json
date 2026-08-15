@@ -30,6 +30,7 @@
     "storage",
     "alarms",
     "scripting",
+    "tabs",
     "clipboardRead",
     "clipboardWrite",
     "bookmarks"

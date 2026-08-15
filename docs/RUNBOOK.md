@@ -7,13 +7,15 @@
   the sync client. Implemented with the Manifest V3 `sidePanel`,
   `contextMenus`, `storage`, `clipboardRead`/`clipboardWrite`, and
   `bookmarks` APIs.
-- **AppImage** (`appimage/`) is a thin wrapper: downloads an
-  [ungoogled-chromium-portablelinux](https://github.com/ungoogled-software/ungoogled-chromium-portablelinux)
-  build (Chromium with Google's integration patches stripped at the
-  source level — not stock Chromium with flags on top), loads the
-  extension via `--load-extension` + `--disable-extensions-except`, and
-  packages it with branding (icon, `.desktop`, AppStream metadata) using
-  a FUSE3-compatible `appimagetool` (go-appimage fork).
+- **AppImage** (`appimage/`) is a thin wrapper: downloads an official
+  open-source Chromium linux64 snapshot (not "Google Chrome" — already
+  lacks Google's proprietary API keys/branding), loads the extension via
+  `--load-extension` + `--disable-extensions-except`, applies our own
+  privacy-hardening flags (see AppRun in `build.sh`), and packages it
+  with branding (icon, `.desktop`, AppStream metadata) using a
+  FUSE3-compatible `appimagetool` (go-appimage fork). Deliberately not
+  built on a third-party de-googling project — see the 2026-08-15 entry
+  below for why that was tried and reverted.
 - **Sync server** is a separate project (Docker, VPS-hosted, zero-knowledge
   E2E encryption, passphrase-derived key, no server-side recovery).
 - Update status lives as a badge on the extension's toolbar icon (not an
@@ -140,12 +142,56 @@
     rail icon on the nested display — confirmed switching works and the
     Settings panel renders the sync form correctly.
 
+- **Reverted ungoogled-chromium back to vanilla Chromium + our own privacy
+  flags** (2026-08-15, same day it was adopted). Charlie's concern: tying
+  the project's release cadence to a third-party de-googling project's
+  continued maintenance is a real risk if that project stalls or
+  disappears. A full from-source Chromium rebuild (the only way to be
+  "more" de-googled than this) isn't realistic for a wrapper-AppImage
+  project — 100GB+ disk, many hours per build, specialized
+  infrastructure. So: back to official open-source Chromium snapshots
+  (already lack Google's proprietary API keys/branding — confirmed live,
+  the browser shows its own "Google API keys are missing" infobar) with
+  our own flags on top, all real documented Chromium switches, not
+  guessed preference keys: `--disable-background-networking`,
+  `--disable-sync`, `--disable-domain-reliability`,
+  `--disable-client-side-phishing-detection`,
+  `--disable-features=Translate,OptimizationHints,AutofillServerCommunication`.
+  **Known gap, documented rather than silently left broken**: the default
+  search engine is still Google in the prepopulated engine list — that's
+  baked into the source, not policy-removable without either a verified
+  Preferences key (not attempted — didn't want to repeat the
+  `pinned_extensions` guessing detour on something this central) or a
+  manual one-time change by the user.
+- **Verified `chrome.sidePanel.open()` cannot be called outside a direct
+  user gesture** — tried wiring it to `chrome.windows.onCreated` to
+  auto-open the sidebar in every new window (as close to Vivaldi's
+  permanent rail as an extension can get), confirmed via a real headful
+  test that it silently does nothing (no error logged, panel just never
+  appears) when called from that event. Removed the dead code rather than
+  ship a false claim. Click-to-open via the toolbar action remains the
+  real mechanism — verified working, and the panel does stay open across
+  tab switches within a window once opened.
+- **"Pin this page" quick-add** (Vivaldi-style): the Panels view now has
+  a prominent button that grabs the active tab's URL via `chrome.tabs`
+  and pins it in one click, with manual URL entry moved to a collapsed
+  "Or pin a specific URL" fallback. Verified end-to-end on a real
+  display: opened the panel on `example.com`, clicked "Pin this page",
+  confirmed the URL appeared in the pinned list and rendered live in the
+  panel's iframe.
+
 ## Not yet built / verified
 
-- Zero-click toolbar pinning — see above; currently correct-but-unreliable
-  pre-seeded state, may need a different approach (e.g. a one-time
-  first-run toast pointing at the puzzle-piece menu instead of fighting
-  Chromium's toolbar-model init order).
+- Zero-click toolbar pinning — currently correct-but-unreliable
+  pre-seeded state (see the ungoogled-chromium entry above), may need a
+  different approach (e.g. a one-time first-run toast pointing at the
+  puzzle-piece menu instead of fighting Chromium's toolbar-model init
+  order).
+- A permanent, un-closable icon rail like Vivaldi's — confirmed not
+  reachable via extension APIs (see above); would need real
+  browser-chrome UI changes, i.e. an actual source-level fork, not a
+  wrapper.
+- Default search engine still defaults to Google — see above.
 - Extensions-list sync (only bookmarks/settings/snippets collections are
   wired into the UI so far; `extensions` collection exists server-side
   but nothing populates it yet).
@@ -153,12 +199,10 @@
   recovery, but there's no "forget this device" or multi-device
   re-login flow built yet beyond the existing-account login path).
 
-## Chromium (ungoogled) version tracking
+## Chromium version tracking
 
-`.github/workflows/build.yml` polls
-ungoogled-chromium-portablelinux's own GitHub releases daily. When the
-latest release tag differs from `appimage/last-built-version.txt`, it
-rebuilds and publishes a new release. The stock-Chromium version of this
-pipeline was confirmed working end-to-end in CI on 2026-08-15; the
-ungoogled-chromium version has been verified with a real local build but
-not yet run through CI (next scheduled/dispatched run will confirm).
+`.github/workflows/build.yml` polls the Chrome versionhistory API daily.
+When the latest linux stable version differs from
+`appimage/last-built-version.txt`, it rebuilds and publishes a new
+release. Confirmed working end-to-end in CI (both before and after the
+ungoogled-chromium detour, same underlying mechanism).

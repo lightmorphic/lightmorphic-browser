@@ -2,7 +2,7 @@ name: Build AppImage
 
 on:
   schedule:
-    # Check for new ungoogled-chromium releases daily.
+    # Check for new Chromium stable releases daily.
     - cron: "0 6 * * *"
   workflow_dispatch: {}
   push:
@@ -15,21 +15,17 @@ jobs:
   check-version:
     runs-on: ubuntu-latest
     outputs:
-      release_tag: ${{ steps.check.outputs.release_tag }}
+      version: ${{ steps.check.outputs.version }}
       changed: ${{ steps.check.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
       - id: check
         run: |
-          # Track ungoogled-chromium-portablelinux's own releases directly
-          # (not Google's Chrome versionhistory API) -- that repo is the
-          # actual thing we consume, and it also carries its own patch-set
-          # revision (the "-1" suffix) independent of the Chromium version.
-          LATEST=$(curl -s "https://api.github.com/repos/ungoogled-software/ungoogled-chromium-portablelinux/releases?per_page=1" \
-            | jq -r '.[0].tag_name')
+          LATEST=$(curl -s "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/stable/versions" \
+            | jq -r '.versions[0].version')
           LAST_BUILT=$(cat appimage/last-built-version.txt 2>/dev/null || echo "none")
           echo "latest=$LATEST last_built=$LAST_BUILT"
-          echo "release_tag=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
           if [ "$LATEST" != "$LAST_BUILT" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -54,7 +50,7 @@ jobs:
           curl -sL -o appimage/appimagetool "$URL"
           chmod +x appimage/appimagetool
       - name: Build AppImage
-        run: ./appimage/build.sh "${{ needs.check-version.outputs.release_tag }}"
+        run: ./appimage/build.sh "${{ needs.check-version.outputs.version }}"
       - name: Commit last-built version
         run: |
           git config user.name "github-actions"
@@ -68,7 +64,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "no changes to commit"
           else
-            git commit -m "Bump bundled ungoogled-chromium to ${{ needs.check-version.outputs.release_tag }}"
+            git commit -m "Bump bundled Chromium to ${{ needs.check-version.outputs.version }}"
             # main can move between this job's checkout and this push (e.g.
             # a concurrent manual push, or two workflow runs overlapping) --
             # retry with a rebase instead of failing outright on the race.
@@ -81,5 +77,5 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.check-version.outputs.release_tag }}
+          tag_name: v${{ needs.check-version.outputs.version }}
           files: dist/*.AppImage

@@ -175,6 +175,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === UPDATE_ALARM) checkForUpdate();
 });
 
+// A truly permanent, un-closable rail like Vivaldi's isn't reachable from
+// an extension -- that's real native browser-chrome UI, not something the
+// sidePanel API can inject. Tried auto-opening on new-window creation as
+// the closest approximation; chrome.sidePanel.open() silently does
+// nothing when called outside a direct user gesture (confirmed by
+// testing, not assumed -- no error is logged, the panel just never
+// appears), so a window-creation event doesn't qualify. Click-to-open
+// remains the real mechanism; once opened it does stay open across tab
+// switches in that window until deliberately closed.
 chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ windowId: tab.windowId });
 });

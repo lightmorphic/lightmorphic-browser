@@ -46,6 +46,16 @@ const webPanelList = document.getElementById("webPanelList");
 const webPanelFrame = document.getElementById("webPanelFrame");
 const addPanelForm = document.getElementById("addPanelForm");
 const addPanelUrl = document.getElementById("addPanelUrl");
+const pinCurrentPageBtn = document.getElementById("pinCurrentPageBtn");
+const pinCurrentPageLabel = document.getElementById("pinCurrentPageLabel");
+
+async function pinUrl(url) {
+  const { webPanels = [] } = await chrome.storage.local.get("webPanels");
+  if (!webPanels.includes(url)) {
+    await chrome.storage.local.set({ webPanels: [...webPanels, url] });
+  }
+  loadWebPanels();
+}
 
 async function loadWebPanels() {
   const { webPanels = [] } = await chrome.storage.local.get("webPanels");
@@ -80,12 +90,22 @@ addPanelForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const url = addPanelUrl.value.trim();
   if (!url) return;
-  const { webPanels = [] } = await chrome.storage.local.get("webPanels");
-  if (!webPanels.includes(url)) {
-    await chrome.storage.local.set({ webPanels: [...webPanels, url] });
-  }
+  await pinUrl(url);
   addPanelUrl.value = "";
-  loadWebPanels();
+});
+
+// Vivaldi-style quick add: grab whatever the user is actually looking at
+// right now instead of making them copy/paste the URL.
+pinCurrentPageBtn.addEventListener("click", async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) {
+    pinCurrentPageLabel.textContent = "Can't pin this page";
+    setTimeout(() => { pinCurrentPageLabel.textContent = "Pin this page"; }, 1500);
+    return;
+  }
+  await pinUrl(tab.url);
+  webPanelFrame.src = tab.url;
+  webPanelFrame.hidden = false;
 });
 
 // ---- Bookmarks ----
