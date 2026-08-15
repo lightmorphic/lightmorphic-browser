@@ -30,3 +30,13 @@
 `.github/workflows/build.yml` polls the Chrome versionhistory API daily.
 When the latest linux stable version differs from
 `appimage/last-built-version.txt`, it rebuilds and publishes a new release.
+
+### Known issue: version string vs. snapshot build number
+
+The versionhistory API returns a version string (e.g. `131.0.6778.85`),
+but `build.sh` currently downloads from the Chromium continuous snapshot
+archive, which is indexed by build number, not version string &mdash; so
+the download URL in `build.sh` doesn't resolve as written. First build ran
+2026-08-15 and failed here. Needs either: (a) resolving version string to
+snapshot build number via the `position_from_release` lookup, or (b)
+switching to a source that's indexed by version string directly.
