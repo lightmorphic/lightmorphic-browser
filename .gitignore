@@ -2,6 +2,6 @@ node_modules/
 dist/
 appimage/AppDir/usr/
 appimage/appimagetool
-appimage/chrome-linux.zip
+appimage/chromium.tar.xz
 *.log
 .DS_Store
