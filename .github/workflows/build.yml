@@ -36,6 +36,8 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.changed == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Fetch FUSE3-compatible appimagetool
