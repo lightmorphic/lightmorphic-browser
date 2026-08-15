@@ -69,7 +69,14 @@ jobs:
             echo "no changes to commit"
           else
             git commit -m "Bump bundled ungoogled-chromium to ${{ needs.check-version.outputs.release_tag }}"
-            git push
+            # main can move between this job's checkout and this push (e.g.
+            # a concurrent manual push, or two workflow runs overlapping) --
+            # retry with a rebase instead of failing outright on the race.
+            for attempt in 1 2 3; do
+              if git push; then break; fi
+              echo "push rejected, pulling and retrying (attempt $attempt)"
+              git pull --rebase
+            done
           fi
       - name: Release
         uses: softprops/action-gh-release@v2
