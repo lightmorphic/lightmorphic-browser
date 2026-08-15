@@ -23,8 +23,32 @@ POSITION=$(curl -sL "https://chromiumdash.appspot.com/fetch_version?version=${CH
   | python3 -c "import json,sys; print(json.load(sys.stdin)['chromium_main_branch_position'])")
 echo "==> Build position: ${POSITION}"
 
-echo "==> Fetching Chromium ${CHROMIUM_VERSION} (linux64, position ${POSITION})"
-curl -sL "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/${POSITION}/chrome-linux.zip" \
+# Not every position has an archived snapshot (only positions where a bot
+# actually ran get one), so probe outward from POSITION for the nearest
+# one that exists. A GCS prefix-listing API exists but sorts entries
+# LEXICOGRAPHICALLY, which silently misorders positions of different
+# digit lengths (e.g. "165443" sorts before "1654408") -- a direct
+# existence probe avoids that trap entirely, at the cost of being O(n)
+# HTTP requests instead of one list call.
+SNAPSHOT_POSITION=""
+for offset in $(seq 0 500); do
+  for candidate in $((POSITION - offset)) $((POSITION + offset)); do
+    code=$(curl -s -o /dev/null -w "%{http_code}" --head \
+      "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/${candidate}/chrome-linux.zip")
+    if [ "$code" = "200" ]; then
+      SNAPSHOT_POSITION="$candidate"
+      break 2
+    fi
+  done
+done
+if [ -z "$SNAPSHOT_POSITION" ]; then
+  echo "==> No archived snapshot found within 500 positions of ${POSITION}" >&2
+  exit 1
+fi
+echo "==> Nearest archived snapshot: ${SNAPSHOT_POSITION} (offset $((SNAPSHOT_POSITION - POSITION)))"
+
+echo "==> Fetching Chromium ${CHROMIUM_VERSION} (linux64, position ${SNAPSHOT_POSITION})"
+curl -sL "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/${SNAPSHOT_POSITION}/chrome-linux.zip" \
   -o "$ROOT/appimage/chrome-linux.zip"
 unzip -q -o "$ROOT/appimage/chrome-linux.zip" -d "$APPDIR/usr/bin"
 mv "$APPDIR/usr/bin/chrome-linux" "$APPDIR/usr/bin/chromium"
@@ -59,14 +83,32 @@ EOF
 chmod +x "$APPDIR/AppRun"
 
 cp "$ROOT/assets/icon-256.png" "$APPDIR/lightmorphic-browser.png"
-cp "$ROOT/appimage/lightmorphic-browser.desktop" "$APPDIR/lightmorphic-browser.desktop"
+cp "$ROOT/appimage/co.lightmorphic.browser.desktop" "$APPDIR/lightmorphic-browser.desktop"
 mkdir -p "$APPDIR/usr/share/metainfo" "$APPDIR/usr/share/applications"
-cp "$ROOT/appimage/co.lightmorphic.browser.appdata.xml" "$APPDIR/usr/share/metainfo/"
-cp "$ROOT/appimage/lightmorphic-browser.desktop" "$APPDIR/usr/share/applications/"
+# appstreamcli enforces (a) filename == <id> and (b) desktop-application
+# ids must be reverse-DNS -- both the appdata file and the applications
+# .desktop file it points at via <launchable> are named co.lightmorphic.browser
+# to satisfy both checks, which go-appimage's appimagetool runs as a hard
+# build failure, not just a lint warning.
+cp "$ROOT/appimage/co.lightmorphic.browser.appdata.xml" "$APPDIR/usr/share/metainfo/co.lightmorphic.browser.appdata.xml"
+cp "$ROOT/appimage/co.lightmorphic.browser.desktop" "$APPDIR/usr/share/applications/co.lightmorphic.browser.desktop"
 
 echo "==> Packaging AppImage"
-"$ROOT/appimage/appimagetool" "$APPDIR" \
-  "$DIST/Lightmorphic-Browser-${CHROMIUM_VERSION}-x86_64.AppImage"
+# This appimagetool build's CLI takes only the AppDir path -- no explicit
+# output-path second argument (that silently no-ops with "Please specify
+# the path to the AppDir"). It auto-names the output from $VERSION and the
+# .desktop file's Name field, so run it from $DIST and rename afterward.
+FINAL_NAME="Lightmorphic-Browser-${CHROMIUM_VERSION}-x86_64.AppImage"
+BUILD_MARKER=$(mktemp)
+(cd "$DIST" && ARCH=x86_64 VERSION="$CHROMIUM_VERSION" "$ROOT/appimage/appimagetool" "$APPDIR")
+GENERATED=$(find "$DIST" -maxdepth 1 -name "*-${CHROMIUM_VERSION}-x86_64.AppImage" -newer "$BUILD_MARKER" | head -1)
+rm -f "$BUILD_MARKER"
+if [ -z "$GENERATED" ]; then
+  echo "==> appimagetool did not produce an AppImage in $DIST" >&2
+  exit 1
+fi
+mv "$GENERATED" "$DIST/$FINAL_NAME"
+chmod +x "$DIST/$FINAL_NAME"
 
 echo "$CHROMIUM_VERSION" > "$ROOT/appimage/last-built-version.txt"
-echo "==> Done: dist/Lightmorphic-Browser-${CHROMIUM_VERSION}-x86_64.AppImage"
+echo "==> Done: dist/$FINAL_NAME"

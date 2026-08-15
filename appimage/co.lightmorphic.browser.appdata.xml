@@ -16,7 +16,7 @@
       are proxied rather than talking to Google directly.
     </p>
   </description>
-  <launchable type="desktop-id">lightmorphic-browser.desktop</launchable>
+  <launchable type="desktop-id">co.lightmorphic.browser.desktop</launchable>
   <url type="homepage">https://browser.lightmorphic.co.uk</url>
   <provides>
     <binary>lightmorphic-browser</binary>

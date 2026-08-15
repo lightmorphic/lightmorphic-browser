@@ -40,8 +40,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fetch FUSE3-compatible appimagetool
         run: |
-          curl -sL -o appimage/appimagetool \
-            https://github.com/probonopd/go-appimage/releases/download/continuous/appimagetool-x86_64.AppImage
+          # Asset filenames embed a build number that changes (e.g.
+          # appimagetool-947-x86_64.AppImage), so resolve the real URL via
+          # the API rather than hardcoding it.
+          URL=$(curl -s "https://api.github.com/repos/probonopd/go-appimage/releases/tags/continuous" \
+            | jq -r '.assets[] | select(.name | test("^appimagetool-[0-9]+-x86_64\\.AppImage$")) | .browser_download_url')
+          curl -sL -o appimage/appimagetool "$URL"
           chmod +x appimage/appimagetool
       - name: Build AppImage
         run: ./appimage/build.sh "${{ needs.check-version.outputs.version }}"
