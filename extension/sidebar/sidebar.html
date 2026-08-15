@@ -6,64 +6,76 @@
 <link rel="stylesheet" href="sidebar.css">
 </head>
 <body>
-  <nav class="tabs" role="tablist">
-    <button class="tab active" data-panel="notes" role="tab" aria-selected="true">Notes</button>
-    <button class="tab" data-panel="panels" role="tab" aria-selected="false">Panels</button>
-    <button class="tab" data-panel="bookmarks" role="tab" aria-selected="false">Bookmarks</button>
-    <button class="tab" data-panel="snippets" role="tab" aria-selected="false">Snippets</button>
-  </nav>
+  <div class="shell">
+    <nav class="rail" role="tablist" aria-label="Sidebar sections">
+      <button class="rail-btn active" data-panel="notes" role="tab" aria-selected="true" title="Notes">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h9l3 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v3h3"/><path d="M6.5 9.5h7M6.5 12.5h7M6.5 15.5h4"/></svg>
+      </button>
+      <button class="rail-btn" data-panel="panels" role="tab" aria-selected="false" title="Panels">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/><circle cx="5.5" cy="6" r="0.6" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="rail-btn" data-panel="bookmarks" role="tab" aria-selected="false" title="Bookmarks">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h10a.5.5 0 0 1 .5.5v13l-5.5-3.5L4.5 17V4a.5.5 0 0 1 .5-.5z"/></svg>
+      </button>
+      <button class="rail-btn" data-panel="snippets" role="tab" aria-selected="false" title="Quick paste snippets">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.2"/><path d="M8 3.5h4a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M7.5 9h5M7.5 12h5"/></svg>
+      </button>
+      <div class="rail-spacer"></div>
+      <button class="rail-btn" data-panel="settings" role="tab" aria-selected="false" title="Settings">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 3.5v2M10 14.5v2M16.5 10h-2M5.5 10h-2M14.6 5.4l-1.4 1.4M6.8 13.2l-1.4 1.4M14.6 14.6l-1.4-1.4M6.8 6.8 5.4 5.4"/></svg>
+      </button>
+    </nav>
 
-  <section id="panel-notes" class="panel-view active">
-    <textarea id="notepad" placeholder="Notes, synced across your devices..."></textarea>
-  </section>
+    <div class="content">
+      <section id="panel-notes" class="panel-view active">
+        <textarea id="notepad" placeholder="Notes, synced across your devices..."></textarea>
+      </section>
 
-  <section id="panel-panels" class="panel-view">
-    <div class="panel-list" id="webPanelList"></div>
-    <form id="addPanelForm" class="add-row">
-      <input id="addPanelUrl" type="url" placeholder="https://..." required>
-      <button type="submit" class="btn-primary">Pin</button>
-    </form>
-    <iframe id="webPanelFrame" class="web-frame" hidden></iframe>
-  </section>
+      <section id="panel-panels" class="panel-view">
+        <div class="panel-list" id="webPanelList"></div>
+        <form id="addPanelForm" class="add-row">
+          <input id="addPanelUrl" type="url" placeholder="https://..." required>
+          <button type="submit" class="btn-primary">Pin</button>
+        </form>
+        <iframe id="webPanelFrame" class="web-frame" hidden></iframe>
+      </section>
 
-  <section id="panel-bookmarks" class="panel-view">
-    <div class="bookmark-tree" id="bookmarkTree"></div>
-  </section>
+      <section id="panel-bookmarks" class="panel-view">
+        <div class="bookmark-tree" id="bookmarkTree"></div>
+      </section>
 
-  <section id="panel-snippets" class="panel-view">
-    <div class="panel-list" id="snippetList"></div>
-    <form id="addSnippetForm" class="add-row snippet-add-row">
-      <input id="addSnippetLabel" type="text" placeholder="Label">
-      <textarea id="addSnippetText" placeholder="Snippet text" required></textarea>
-      <button type="submit" class="btn-primary">Save</button>
-    </form>
-  </section>
+      <section id="panel-snippets" class="panel-view">
+        <div class="panel-list" id="snippetList"></div>
+        <form id="addSnippetForm" class="add-row snippet-add-row">
+          <input id="addSnippetLabel" type="text" placeholder="Label">
+          <textarea id="addSnippetText" placeholder="Snippet text" required></textarea>
+          <button type="submit" class="btn-primary">Save</button>
+        </form>
+      </section>
 
-  <dialog id="syncSetupDialog">
-    <form id="syncSetupForm" method="dialog">
-      <h2>Set up sync</h2>
-      <label>Passphrase
-        <input id="syncPassphrase" type="password" required autocomplete="new-password">
-      </label>
-      <p class="hint">There is no recovery if you forget this &mdash; it never leaves your device.</p>
-      <label>Sync server (leave default unless self-hosting)
-        <input id="syncServerUrl" type="url" placeholder="https://sync.lightmorphic.co.uk">
-      </label>
-      <label class="checkbox-row">
-        <input id="syncIsNewAccount" type="checkbox" checked>
-        This is a new sync account
-      </label>
-      <div class="dialog-actions">
-        <button type="button" id="syncCancel" class="btn-secondary">Cancel</button>
-        <button type="submit" class="btn-primary">Continue</button>
-      </div>
-    </form>
-  </dialog>
-
-  <footer class="status-row" id="statusRow">
-    <span class="status-dot" id="updateDot"></span>
-    <span id="statusText">Lightmorphic Browser</span>
-  </footer>
+      <section id="panel-settings" class="panel-view">
+        <h2 class="settings-heading">Sync</h2>
+        <div class="status-row" id="statusRow">
+          <span class="status-dot" id="updateDot"></span>
+          <span id="statusText">Sync not set up</span>
+        </div>
+        <form id="syncSetupForm" class="settings-form">
+          <label>Passphrase
+            <input id="syncPassphrase" type="password" required autocomplete="new-password">
+          </label>
+          <p class="hint">There is no recovery if you forget this &mdash; it never leaves your device.</p>
+          <label>Sync server (leave default unless self-hosting)
+            <input id="syncServerUrl" type="url" placeholder="https://sync.lightmorphic.co.uk">
+          </label>
+          <label class="checkbox-row">
+            <input id="syncIsNewAccount" type="checkbox" checked>
+            This is a new sync account
+          </label>
+          <button type="submit" class="btn-primary">Save &amp; connect</button>
+        </form>
+      </section>
+    </div>
+  </div>
 
   <script type="module" src="sidebar.js"></script>
 </body>

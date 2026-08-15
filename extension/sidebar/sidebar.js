@@ -1,14 +1,14 @@
 import { pull, push, isConfigured, setupSync } from "../sync/syncClient.js";
 
-// ---- Tabs ----
-for (const tab of document.querySelectorAll(".tab")) {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((t) => {
-      t.classList.toggle("active", t === tab);
-      t.setAttribute("aria-selected", String(t === tab));
+// ---- Icon rail ----
+for (const btn of document.querySelectorAll(".rail-btn")) {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".rail-btn").forEach((b) => {
+      b.classList.toggle("active", b === btn);
+      b.setAttribute("aria-selected", String(b === btn));
     });
     document.querySelectorAll(".panel-view").forEach((p) => {
-      p.classList.toggle("active", p.id === `panel-${tab.dataset.panel}`);
+      p.classList.toggle("active", p.id === `panel-${btn.dataset.panel}`);
     });
   });
 }
@@ -167,20 +167,11 @@ async function loadStatus() {
   text.textContent = configured ? "Synced" : "Sync not set up";
 }
 
-// ---- Sync setup ----
-const statusRow = document.getElementById("statusRow");
-const syncSetupDialog = document.getElementById("syncSetupDialog");
+// ---- Sync setup (lives inline in the Settings panel, not a modal) ----
 const syncSetupForm = document.getElementById("syncSetupForm");
-const syncCancel = document.getElementById("syncCancel");
 
-statusRow.addEventListener("click", async () => {
-  if (await isConfigured()) return;
-  syncSetupDialog.showModal();
-});
-
-syncCancel.addEventListener("click", () => syncSetupDialog.close());
-
-syncSetupForm.addEventListener("submit", async () => {
+syncSetupForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
   const passphrase = document.getElementById("syncPassphrase").value;
   const serverInput = document.getElementById("syncServerUrl").value.trim();
   const isNewAccount = document.getElementById("syncIsNewAccount").checked;

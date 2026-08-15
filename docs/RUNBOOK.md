@@ -104,12 +104,48 @@
     was first written) and is moot now anyway since ungoogled-chromium
     strips sign-in/sync at the source level.
 
+- **Real screen verification, extension-disable bug, and sidebar redesign**
+  (2026-08-15). Used `Xephyr` (a nested X server, no root needed) to get a
+  real isolated display for actual click-testing, rather than continuing
+  to guess from headless/CDP output alone — deliberately not on Charlie's
+  real desktop, since this environment's `DISPLAY=:0` turned out to be
+  his live session with his own windows open.
+  - **Found the actual root cause of "nothing there" on a relaunch**: an
+    extension loaded via `--load-extension` survives the first launch but
+    gets silently **disabled** on reload/relaunch ("Turn on developer
+    mode to use this extension") unless Developer Mode is already on.
+    Watched it happen live (toggle flips off, warning banner appears).
+    Fixed by pre-seeding `extensions.ui.developer_mode: true` in the
+    profile's `Preferences` file on first run.
+  - Gave the extension a fixed `key` in its manifest so its ID is stable
+    (`hokpgjhmbdcggofdeaaobeknogcmlbfa`) across builds instead of derived
+    from the load path — verified the ID computation against a real load,
+    not just calculated.
+  - Attempted to pre-pin the toolbar icon via `pinned_extensions`
+    (confirmed as the correct **top-level** Preferences key, not nested
+    under `extensions` as first guessed — found by manually pinning via
+    the UI and diffing the file). Pre-seeding it before first launch does
+    not reliably paint the icon on first render in testing, even though
+    the value is objectively correct and persists once set. Kept in
+    `build.sh` since it's harmless and correct, but a user may still need
+    one manual pin click the first time — not the zero-click result
+    originally wanted, worth revisiting.
+  - Confirmed the extension's real icon (not a placeholder) renders
+    correctly in `chrome://extensions` via a swap-to-solid-red test.
+  - **Sidebar redesigned**: Vivaldi-style icon rail (Notes / Panels /
+    Bookmarks / Snippets / Settings, inline SVGs) replacing the old
+    top text-tab bar; Settings is now a real panel with the sync form
+    inline, not a `<dialog>` modal. Verified by actually opening the side
+    panel via the extension's toolbar action and clicking through each
+    rail icon on the nested display — confirmed switching works and the
+    Settings panel renders the sync form correctly.
+
 ## Not yet built / verified
 
-- The ungoogled-chromium build has not yet been run through a real
-  screen/display — verified via headless + CDP that Chromium launches
-  and the extension's service worker loads, not via clicking through
-  the UI.
+- Zero-click toolbar pinning — see above; currently correct-but-unreliable
+  pre-seeded state, may need a different approach (e.g. a one-time
+  first-run toast pointing at the puzzle-piece menu instead of fighting
+  Chromium's toolbar-model init order).
 - Extensions-list sync (only bookmarks/settings/snippets collections are
   wired into the UI so far; `extensions` collection exists server-side
   but nothing populates it yet).

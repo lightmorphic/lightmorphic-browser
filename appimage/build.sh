@@ -36,6 +36,44 @@ cat > "$APPDIR/AppRun" <<'EOF'
 #!/usr/bin/env bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 EXT="$HERE/usr/share/lightmorphic-browser/extension"
+USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
+PROFILE_DIR="$USER_DATA_DIR/Default"
+
+# Extension has a fixed "key" in its manifest (see extension/manifest.json)
+# so its ID is stable (hokpgjhmbdcggofdeaaobeknogcmlbfa) instead of
+# derived from the load path. Two things get pre-seeded into the profile's
+# own Preferences file, verified empirically (via a real headful launch on
+# an isolated nested X display, not guessed) against this Chromium build,
+# only on a genuine first run so a user's own later choices aren't fought:
+#
+# 1. pinned_extensions -- the real top-level key (NOT nested under
+#    "extensions", despite that being the more "logical" guess that
+#    silently did nothing when tried first). Confirmed correct by manually
+#    pinning via the UI and diffing the file, but pre-seeding it before
+#    first launch did not reliably paint the icon on first render in
+#    testing -- worth keeping since it's the genuinely correct value, but
+#    a user may still need one manual pin click the very first time.
+# 2. extensions.ui.developer_mode -- this is the more important fix. An
+#    extension loaded via --load-extension survives the FIRST launch, but
+#    gets silently DISABLED on a reload/relaunch ("Turn on developer mode
+#    to use this extension") unless developer mode is already on. This
+#    reproduces exactly what looked like "the extension just isn't there"
+#    on a second run -- confirmed by watching it happen (toggle flips off,
+#    warning banner appears) and fixed by pre-enabling developer mode.
+if [ ! -f "$PROFILE_DIR/Preferences" ]; then
+  mkdir -p "$PROFILE_DIR"
+  cat > "$PROFILE_DIR/Preferences" <<'PREFS'
+{
+  "pinned_extensions": ["hokpgjhmbdcggofdeaaobeknogcmlbfa"],
+  "extensions": {
+    "ui": {
+      "developer_mode": true
+    }
+  }
+}
+PREFS
+fi
+
 # Extension installs are routed through the Lightmorphic Web Store proxy
 # instead of talking to Google's gallery/update servers directly.
 #
@@ -48,7 +86,7 @@ EXT="$HERE/usr/share/lightmorphic-browser/extension"
 exec "$HERE/usr/bin/chromium/chrome" \
   --load-extension="$EXT" \
   --disable-extensions-except="$EXT" \
-  --user-data-dir="${HOME}/.config/lightmorphic-browser" \
+  --user-data-dir="$USER_DATA_DIR" \
   --apps-gallery-url="https://webstore-proxy.lightmorphic.co.uk/webstore" \
   --apps-gallery-update-url="https://webstore-proxy.lightmorphic.co.uk/service/update2/crx" \
   --apps-gallery-download-url="https://webstore-proxy.lightmorphic.co.uk/crx/%s.crx" \
