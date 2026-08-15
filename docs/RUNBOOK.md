@@ -34,10 +34,14 @@
   login rejection, unauthenticated access rejection, put/get roundtrip,
   stale-version conflict detection all verified working.
 - Deploy: private ops repo `lightmorphic-sync-deploy` on Forgejo
-  (git.lightmorphic.co.uk), targeting lm101 — nginx vhosts for
-  `sync.lightmorphic.co.uk` and `webstore-proxy.lightmorphic.co.uk`,
-  compose file, deploy/update instructions. **Not yet actually deployed
-  to lm101** (DNS not pointed there yet) — repo is ready to go.
+  (git.lightmorphic.co.uk), running on lm101. **Live since 2026-08-15**
+  at https://sync.lightmorphic.co.uk and
+  https://webstore-proxy.lightmorphic.co.uk, TLS via certbot, verified
+  with a full register/login/put/get/delete cycle over the real domain
+  — this is exactly the `DEFAULT_SERVER` already hardcoded in
+  `extension/sync/syncClient.js` and the `--apps-gallery-*` URLs in
+  `appimage/build.sh`'s launcher, so no code changes were needed once
+  DNS was in place.
 - AppImage `build.sh`: fully working, verified with a real local build
   and confirmed again in CI. Three separate real bugs were found and
   fixed by actually running the pipeline instead of trusting it:
@@ -76,11 +80,6 @@
 - Passphrase change / account recovery UX (by design there is no
   recovery, but there's no "forget this device" or multi-device
   re-login flow built yet beyond the existing-account login path).
-- Sync server not yet actually deployed anywhere live (repo + deploy
-  config are ready; DNS for `sync.lightmorphic.co.uk` and
-  `webstore-proxy.lightmorphic.co.uk` still points at the other VPS via
-  what looks like a wildcard record, not lm101 — needs explicit A
-  records before deploying).
 
 ## Chromium version tracking
 
