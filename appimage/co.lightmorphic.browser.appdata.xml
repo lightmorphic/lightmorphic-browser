@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>co.lightmorphic.browser</id>
+  <name>Lightmorphic Browser</name>
+  <summary>Privacy-first browser built on Chromium</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      Lightmorphic Browser is a privacy-first browser built on Chromium.
+      Sync is end-to-end encrypted &#8212; your data is encrypted before it
+      ever leaves your device, so even a compromised sync server can't read
+      it. Self-host your own sync server or use ours. A sidebar panel
+      (notes, pinned pages, bookmarks) and a right-click quick-paste tool
+      for snippets and clipboard history round it out. Extension installs
+      are proxied rather than talking to Google directly.
+    </p>
+  </description>
+  <launchable type="desktop-id">lightmorphic-browser.desktop</launchable>
+  <url type="homepage">https://browser.lightmorphic.co.uk</url>
+  <provides>
+    <binary>lightmorphic-browser</binary>
+  </provides>
+</component>

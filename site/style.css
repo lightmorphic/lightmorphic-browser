@@ -1,0 +1,104 @@
+@font-face {
+  font-family: "Manrope";
+  src: url("fonts/Manrope-VariableFont_wght.ttf") format("truetype-variations");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff; --fg: #09090b;
+  --panel: #ffffff; --panel-border: rgba(24, 24, 40, 0.10);
+  --muted-fg: #71717a;
+  --shadow-panel: 0 1px 2px rgba(24,24,40,.05), 0 8px 24px -16px rgba(24,24,40,.18);
+  --accent: #fbc711; --on-accent: #645007;
+  --brand-navy: #111827;
+  --radius: 0.875rem; --panel-radius: 1.375rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b; --fg: #fafafa;
+    --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
+    --muted-fg: #a1a1aa;
+    --shadow-panel: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px -16px rgba(0,0,0,.6);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.6;
+}
+
+.hero {
+  text-align: center;
+  padding: 4rem 1.5rem 3rem;
+}
+
+.hero-icon {
+  border-radius: 20%;
+  margin-bottom: 1rem;
+}
+
+.hero h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+}
+
+.tagline {
+  color: var(--muted-fg);
+  font-size: 1.125rem;
+  margin: 0 0 1.5rem;
+}
+
+.btn-primary {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius);
+}
+
+main {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--shadow-panel);
+  padding: 1.5rem;
+}
+
+.panel h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.panel p {
+  margin: 0;
+  color: var(--muted-fg);
+}
+
+footer {
+  text-align: center;
+  color: var(--muted-fg);
+  padding: 2rem 1.5rem 3rem;
+  font-size: 0.875rem;
+}

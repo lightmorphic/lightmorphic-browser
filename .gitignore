@@ -1,0 +1,7 @@
+node_modules/
+dist/
+appimage/AppDir/usr/
+appimage/appimagetool
+appimage/chrome-linux.zip
+*.log
+.DS_Store
