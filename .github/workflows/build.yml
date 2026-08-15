@@ -56,8 +56,17 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add appimage/last-built-version.txt
-          git commit -m "Bump bundled Chromium to ${{ needs.check-version.outputs.version }}" || echo "no changes"
-          git push || echo "nothing to push"
+          # `git commit` legitimately exits non-zero when there's nothing
+          # new to commit -- that specific case is fine to swallow. A push
+          # failure is not: don't let it hide behind the same `|| true`,
+          # since that's exactly what masked the missing contents:write
+          # permission earlier (step showed "success" while doing nothing).
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "Bump bundled Chromium to ${{ needs.check-version.outputs.version }}"
+            git push
+          fi
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
