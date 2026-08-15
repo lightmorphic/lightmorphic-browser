@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lightmorphic sidebar</title>
+<link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-panel="notes" role="tab" aria-selected="true">Notes</button>
+    <button class="tab" data-panel="panels" role="tab" aria-selected="false">Panels</button>
+    <button class="tab" data-panel="bookmarks" role="tab" aria-selected="false">Bookmarks</button>
+    <button class="tab" data-panel="snippets" role="tab" aria-selected="false">Snippets</button>
+  </nav>
+
+  <section id="panel-notes" class="panel-view active">
+    <textarea id="notepad" placeholder="Notes, synced across your devices..."></textarea>
+  </section>
+
+  <section id="panel-panels" class="panel-view">
+    <div class="panel-list" id="webPanelList"></div>
+    <form id="addPanelForm" class="add-row">
+      <input id="addPanelUrl" type="url" placeholder="https://..." required>
+      <button type="submit" class="btn-primary">Pin</button>
+    </form>
+    <iframe id="webPanelFrame" class="web-frame" hidden></iframe>
+  </section>
+
+  <section id="panel-bookmarks" class="panel-view">
+    <div class="bookmark-tree" id="bookmarkTree"></div>
+  </section>
+
+  <section id="panel-snippets" class="panel-view">
+    <div class="panel-list" id="snippetList"></div>
+    <form id="addSnippetForm" class="add-row snippet-add-row">
+      <input id="addSnippetLabel" type="text" placeholder="Label">
+      <textarea id="addSnippetText" placeholder="Snippet text" required></textarea>
+      <button type="submit" class="btn-primary">Save</button>
+    </form>
+  </section>
+
+  <dialog id="syncSetupDialog">
+    <form id="syncSetupForm" method="dialog">
+      <h2>Set up sync</h2>
+      <label>Passphrase
+        <input id="syncPassphrase" type="password" required autocomplete="new-password">
+      </label>
+      <p class="hint">There is no recovery if you forget this &mdash; it never leaves your device.</p>
+      <label>Sync server (leave default unless self-hosting)
+        <input id="syncServerUrl" type="url" placeholder="https://sync.lightmorphic.co.uk">
+      </label>
+      <label class="checkbox-row">
+        <input id="syncIsNewAccount" type="checkbox" checked>
+        This is a new sync account
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="syncCancel" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Continue</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="status-row" id="statusRow">
+    <span class="status-dot" id="updateDot"></span>
+    <span id="statusText">Lightmorphic Browser</span>
+  </footer>
+
+  <script type="module" src="sidebar.js"></script>
+</body>
+</html>
