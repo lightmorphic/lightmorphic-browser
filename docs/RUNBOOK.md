@@ -3,10 +3,15 @@
 ## Architecture
 
 - **Extension** (`extension/`) is the actual product: sidebar (notes, web
-  panels, bookmarks), quick paste (context menu + clipboard history), and
-  the sync client. Implemented with the Manifest V3 `sidePanel`,
-  `contextMenus`, `storage`, `clipboardRead`/`clipboardWrite`, and
-  `bookmarks` APIs.
+  panels, bookmarks-in-sidebar), quick paste (context menu + clipboard
+  history), and the sync client. Implemented with the Manifest V3
+  `sidePanel`, `contextMenus`, `storage`, `tabs`,
+  `clipboardRead`/`clipboardWrite`, and `bookmarks` APIs.
+- **Theme** (`theme/`) is a separate package, not merged into the
+  extension's own manifest — a `"theme"` key alongside full extension
+  functionality in one manifest silently breaks the extension (see the
+  2026-08-15 entry below). Loaded side by side with the extension via
+  `--load-extension`'s comma-separated path list.
 - **AppImage** (`appimage/`) is a thin wrapper: downloads an official
   open-source Chromium linux64 snapshot (not "Google Chrome" — already
   lacks Google's proprietary API keys/branding), loads the extension via
@@ -180,18 +185,56 @@
   confirmed the URL appeared in the pinned list and rendered live in the
   panel's iframe.
 
+- **Deep dive on browser UX trends, DuckDuckGo default (verified), native
+  theme, bookmarks-in-sidebar** (2026-08-15). Web research (not just
+  priors) on what people actually want from a browser in 2026 confirmed
+  two things already underway: vertical/sidebar tab and panel layouts are
+  a real, broad trend (Chrome and Firefox both adding them), and the
+  `chrome.sidePanel.open()` gesture restriction is a hard, documented
+  Chromium security restriction with no workaround — external sources
+  agree with what testing had already shown, so that item moves from
+  "worth revisiting" to genuinely closed; a permanent Vivaldi-style rail
+  needs real browser-chrome UI, not reachable from any extension.
+  - **Default search engine fixed for real**: seeded
+    `default_search_provider_data` (DuckDuckGo) in the first-run
+    `Preferences` file. Verified two ways, not assumed: the omnibox
+    placeholder read "Search DuckDuckGo or type a URL", and an actual
+    typed query navigated to `duckduckgo.com/?q=...`, not Google. No
+    Google default search left in the shipped browser. (There is no
+    extension mechanism for this on Linux at all —
+    `chrome_settings_overrides.search_provider` is Windows/Mac only per
+    Chrome's own docs, confirmed by research — so this Preferences seed
+    is the only lever, and it only works pre-first-run.)
+  - **Native Lightmorphic browser theme** added (navy frame/toolbar,
+    yellow accent) using Chrome's `"theme"` manifest key. First attempt
+    merged it into the main extension's manifest — this silently broke
+    the *entire* extension (loaded, but vanished from
+    `chrome://extensions` with no error) despite the theme itself
+    visibly applying. Not something the initial research surfaced; found
+    only by actually launching the built AppImage on a real display.
+    Fixed by splitting into two separate packages (`extension/`,
+    `theme/`) loaded side by side via `--load-extension`'s
+    comma-separated path list — verified both load correctly together
+    (extension enabled with real icon + service worker; theme applies,
+    "Installed theme" banner names it correctly).
+  - **Bookmarks now open inside the sidebar**, not a new tab — same
+    pattern as pinned web panels. Added a "Bookmark this page" quick-add
+    button (mirrors "Pin this page"). Verified end-to-end: bookmarked
+    example.com from the sidebar, confirmed it appeared in the tree, and
+    confirmed clicking it loaded inline in the panel's own frame rather
+    than opening a tab.
+  - Settings panel gained a "Search engine" section: static status
+    (DuckDuckGo, not Google) plus a "Change search engine…" button that
+    opens `chrome://settings/searchEngines` — the honest fallback, since
+    there's no way for an extension to change the default while the
+    browser is already running, only before first launch.
+
 ## Not yet built / verified
 
-- Zero-click toolbar pinning — currently correct-but-unreliable
-  pre-seeded state (see the ungoogled-chromium entry above), may need a
-  different approach (e.g. a one-time first-run toast pointing at the
-  puzzle-piece menu instead of fighting Chromium's toolbar-model init
-  order).
-- A permanent, un-closable icon rail like Vivaldi's — confirmed not
-  reachable via extension APIs (see above); would need real
-  browser-chrome UI changes, i.e. an actual source-level fork, not a
-  wrapper.
-- Default search engine still defaults to Google — see above.
+- Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
+  state (`pinned_extensions` is right, confirmed by diffing a manual
+  pin, but doesn't reliably paint on first render). One manual pin click
+  may still be needed the first time.
 - Extensions-list sync (only bookmarks/settings/snippets collections are
   wired into the UI so far; `extensions` collection exists server-side
   but nothing populates it yet).

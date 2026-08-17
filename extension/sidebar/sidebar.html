@@ -49,6 +49,11 @@
 
       <section id="panel-bookmarks" class="panel-view">
         <div class="bookmark-tree" id="bookmarkTree"></div>
+        <button id="bookmarkCurrentPageBtn" class="add-current-btn" type="button" title="Bookmark the page you're on now">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4.5v11M4.5 10h11"/></svg>
+          <span id="bookmarkCurrentPageLabel">Bookmark this page</span>
+        </button>
+        <iframe id="bookmarkFrame" class="web-frame" hidden></iframe>
       </section>
 
       <section id="panel-snippets" class="panel-view">
@@ -61,6 +66,14 @@
       </section>
 
       <section id="panel-settings" class="panel-view">
+        <h2 class="settings-heading">Search engine</h2>
+        <div class="status-row">
+          <span class="status-dot ok"></span>
+          <span>DuckDuckGo &mdash; not Google, by default</span>
+        </div>
+        <button id="changeSearchEngineBtn" class="btn-secondary" type="button">Change search engine&hellip;</button>
+        <p class="hint">Opens the browser's own search engine settings &mdash; there's no way for an extension to switch this while the browser is running, only to set it before first launch.</p>
+
         <h2 class="settings-heading">Sync</h2>
         <div class="status-row" id="statusRow">
           <span class="status-dot" id="updateDot"></span>

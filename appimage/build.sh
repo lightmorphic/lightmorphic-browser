@@ -67,11 +67,23 @@ mv "$APPDIR/usr/bin/chrome-linux" "$APPDIR/usr/bin/chromium"
 echo "==> Bundling extension"
 cp -r "$ROOT/extension/." "$APPDIR/usr/share/lightmorphic-browser/extension/"
 
+echo "==> Bundling theme"
+# A separate package, not a "theme" key merged into the main extension's
+# manifest -- tried that first and it silently broke the whole extension
+# (chrome://extensions showed nothing loaded at all, despite the theme
+# itself visibly applying). Confirmed by testing, not assumed. Two
+# packages loaded side by side via --load-extension's comma-separated
+# path list works correctly for both.
+mkdir -p "$APPDIR/usr/share/lightmorphic-browser/theme"
+cp -r "$ROOT/theme/." "$APPDIR/usr/share/lightmorphic-browser/theme/"
+
 echo "==> Writing launcher"
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/usr/bin/env bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 EXT="$HERE/usr/share/lightmorphic-browser/extension"
+THEME="$HERE/usr/share/lightmorphic-browser/theme"
+LOAD_PATHS="$EXT,$THEME"
 USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
 PROFILE_DIR="$USER_DATA_DIR/Default"
 
@@ -96,6 +108,15 @@ PROFILE_DIR="$USER_DATA_DIR/Default"
 #    reproduces exactly what looked like "the extension just isn't there"
 #    on a second run -- confirmed by watching it happen (toggle flips off,
 #    warning banner appears) and fixed by pre-enabling developer mode.
+# 3. default_search_provider_data -- sets DuckDuckGo (not Google) as the
+#    actual default search engine from first launch. Verified empirically:
+#    launched with this seeded, confirmed the omnibox placeholder read
+#    "Search DuckDuckGo or type a URL", then actually typed a query and
+#    confirmed it navigated to duckduckgo.com, not Google. There's no
+#    extension API to do this on Linux (chrome_settings_overrides'
+#    search_provider is Windows/Mac only per Chrome's own docs), so this
+#    is the only reliable mechanism -- and it only applies pre-first-run,
+#    which is exactly when this file is written.
 if [ ! -f "$PROFILE_DIR/Preferences" ]; then
   mkdir -p "$PROFILE_DIR"
   cat > "$PROFILE_DIR/Preferences" <<'PREFS'
@@ -104,6 +125,20 @@ if [ ! -f "$PROFILE_DIR/Preferences" ]; then
   "extensions": {
     "ui": {
       "developer_mode": true
+    }
+  },
+  "default_search_provider_data": {
+    "template_url_data": {
+      "short_name": "DuckDuckGo",
+      "keyword": "duckduckgo.com",
+      "url": "https://duckduckgo.com/?q={searchTerms}",
+      "suggestions_url": "https://duckduckgo.com/ac/?q={searchTerms}&type=list",
+      "favicon_url": "https://duckduckgo.com/favicon.ico",
+      "safe_for_autoreplace": false,
+      "input_encodings": ["UTF-8"],
+      "id": "2000",
+      "prepopulate_id": 0,
+      "is_active": 1
     }
   }
 }
@@ -138,14 +173,9 @@ fi
 #                                      skips the upstream search-engine
 #                                      prompt (cosmetic, not itself a privacy
 #                                      fix)
-# Known gap, documented rather than guessed at: the default search engine
-# in the prepopulated engine list is still Google (baked into the source,
-# not policy-removable without a real patch) -- changing it needs either a
-# verified Preferences key (not yet done, see docs/RUNBOOK.md) or a manual
-# one-time change by the user in Settings.
 exec "$HERE/usr/bin/chromium/chrome" \
-  --load-extension="$EXT" \
-  --disable-extensions-except="$EXT" \
+  --load-extension="$LOAD_PATHS" \
+  --disable-extensions-except="$LOAD_PATHS" \
   --user-data-dir="$USER_DATA_DIR" \
   --disable-background-networking \
   --disable-sync \

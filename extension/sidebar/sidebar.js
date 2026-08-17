@@ -13,6 +13,11 @@ for (const btn of document.querySelectorAll(".rail-btn")) {
   });
 }
 
+// ---- Search engine ----
+document.getElementById("changeSearchEngineBtn").addEventListener("click", () => {
+  chrome.tabs.create({ url: "chrome://settings/searchEngines" });
+});
+
 // ---- Notepad ----
 const notepad = document.getElementById("notepad");
 let notepadSaveTimer = null;
@@ -109,6 +114,10 @@ pinCurrentPageBtn.addEventListener("click", async () => {
 });
 
 // ---- Bookmarks ----
+const bookmarkFrame = document.getElementById("bookmarkFrame");
+const bookmarkCurrentPageBtn = document.getElementById("bookmarkCurrentPageBtn");
+const bookmarkCurrentPageLabel = document.getElementById("bookmarkCurrentPageLabel");
+
 async function loadBookmarks() {
   const tree = document.getElementById("bookmarkTree");
   tree.innerHTML = "";
@@ -124,16 +133,34 @@ async function loadBookmarks() {
       }
       node.children.forEach((child) => render(child, container));
     } else if (node.url) {
+      // Opens inside the sidebar's own frame rather than a new tab --
+      // bookmarks behave the same way pinned panels do.
       const link = document.createElement("a");
       link.href = node.url;
       link.textContent = node.title || node.url;
-      link.target = "_blank";
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        bookmarkFrame.src = node.url;
+        bookmarkFrame.hidden = false;
+      });
       container.appendChild(link);
     }
   }
 
   render(root, tree);
 }
+
+bookmarkCurrentPageBtn.addEventListener("click", async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) {
+    bookmarkCurrentPageLabel.textContent = "Can't bookmark this page";
+    setTimeout(() => { bookmarkCurrentPageLabel.textContent = "Bookmark this page"; }, 1500);
+    return;
+  }
+  await chrome.bookmarks.create({ title: tab.title || tab.url, url: tab.url });
+  bookmarkCurrentPageLabel.textContent = "Bookmarked";
+  setTimeout(() => { bookmarkCurrentPageLabel.textContent = "Bookmark this page"; }, 1500);
+});
 
 // ---- Snippets ----
 const snippetList = document.getElementById("snippetList");

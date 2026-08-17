@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Lightmorphic Theme",
+  "version": "0.1.0",
+  "description": "Navy and yellow browser theme matching Lightmorphic Browser.",
+  "theme": {
+    "colors": {
+      "frame": [17, 24, 39],
+      "frame_inactive": [17, 24, 39],
+      "toolbar": [27, 29, 41],
+      "tab_text": [255, 255, 255],
+      "tab_background_text": [161, 161, 170],
+      "bookmark_text": [255, 255, 255],
+      "toolbar_text": [255, 255, 255],
+      "ntp_background": [9, 9, 11],
+      "ntp_text": [255, 255, 255],
+      "ntp_link": [251, 199, 17],
+      "button_background": [251, 199, 17],
+      "omnibox_background": [27, 29, 41],
+      "omnibox_text": [255, 255, 255]
+    }
+  }
+}

@@ -199,6 +199,18 @@ body {
   cursor: pointer;
 }
 
+.btn-secondary {
+  background: var(--muted);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font: inherit;
+  padding: 0.5rem 0.875rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
 /* Pinned sites render at the panel's natural (narrow) width, same as a
    phone viewport -- a responsive site's own media queries do the rest.
    No user-agent spoofing needed or wanted. */
