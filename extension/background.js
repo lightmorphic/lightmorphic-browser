@@ -121,31 +121,81 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.snippets) rebuildQuickPasteMenu();
 });
 
-// ---- Update badge ----
+// ---- Update system ----
 // Update status can't live as an OS-level overlay (nothing can inject
-// into Chromium's own browser chrome from outside), so it lives on the
-// extension's own toolbar icon instead.
+// into Chromium's own browser chrome from outside), so the real detail
+// lives in the sidebar's Settings panel (a proper coloured dot, matching
+// house style) with a lightweight badge on the toolbar icon as a
+// secondary signal. State is shared via chrome.storage so the sidebar
+// can render it without duplicating the check logic.
+//
+// Honest limit: a downloaded AppImage can't safely replace the one
+// currently running itself from extension code alone (no filesystem
+// access beyond the Downloads folder, no permission to exec anything) --
+// "click to update" downloads the new AppImage for real via
+// chrome.downloads, then tells the user to swap it in and relaunch,
+// rather than claiming a silent one-click self-replace that isn't
+// actually achievable without a native-messaging helper (not built).
 async function checkForUpdate() {
+  await chrome.storage.local.set({ updateStatus: { state: "checking" } });
   try {
     const res = await fetch("https://api.github.com/repos/lightmorphic/lightmorphic-browser/releases/latest");
     if (!res.ok) throw new Error(String(res.status));
-    const { tag_name } = await res.json();
-    const manifest = chrome.runtime.getManifest();
-    const current = `v${manifest.browser_version || manifest.version}`;
-    if (tag_name && tag_name !== current) {
+    const release = await res.json();
+    // NOT the extension's own manifest version -- that tracks the
+    // extension's code, not the bundled Chromium release, and would
+    // never match a release tag like "v151.0.7922.137", showing "update
+    // available" permanently even when fully current. version.json is
+    // written by build.sh with the actual release this AppImage is.
+    const versionInfo = await fetch(chrome.runtime.getURL("version.json")).then((r) => r.json());
+    const current = versionInfo.releaseTag;
+    const asset = release.assets?.find((a) => a.name?.endsWith(".AppImage"));
+
+    if (release.tag_name && release.tag_name !== current) {
+      await chrome.storage.local.set({
+        updateStatus: { state: "available", latestTag: release.tag_name, downloadUrl: asset?.browser_download_url },
+      });
       chrome.action.setBadgeText({ text: "!" });
       chrome.action.setBadgeBackgroundColor({ color: "#FBC711" });
-      chrome.action.setTitle({ title: `Lightmorphic Browser -- update available (${tag_name})` });
+      chrome.action.setTitle({ title: `Lightmorphic Browser -- update available (${release.tag_name})` });
     } else {
+      await chrome.storage.local.set({ updateStatus: { state: "ok" } });
       chrome.action.setBadgeText({ text: "" });
       chrome.action.setTitle({ title: "Lightmorphic Browser" });
     }
   } catch {
+    await chrome.storage.local.set({ updateStatus: { state: "error" } });
     chrome.action.setBadgeText({ text: "?" });
     chrome.action.setBadgeBackgroundColor({ color: "#9E9D9E" });
     chrome.action.setTitle({ title: "Lightmorphic Browser -- couldn't check for updates" });
   }
 }
+
+let activeDownloadId = null;
+
+async function downloadUpdate() {
+  const { updateStatus } = await chrome.storage.local.get("updateStatus");
+  if (updateStatus?.state !== "available" || !updateStatus.downloadUrl) return;
+  await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "downloading" } });
+  activeDownloadId = await chrome.downloads.download({ url: updateStatus.downloadUrl, saveAs: false });
+}
+
+chrome.downloads.onChanged.addListener(async (delta) => {
+  if (delta.id !== activeDownloadId) return;
+  const { updateStatus } = await chrome.storage.local.get("updateStatus");
+  if (delta.state?.current === "complete") {
+    await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "ready" } });
+    chrome.action.setBadgeText({ text: "✓" });
+    chrome.action.setBadgeBackgroundColor({ color: "#2295F1" });
+  } else if (delta.state?.current === "interrupted") {
+    await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "error" } });
+  }
+});
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "lightmorphic-download-update") downloadUpdate();
+  return false;
+});
 
 // ---- Sync poll ----
 async function syncCollection(name, localValue) {
@@ -169,6 +219,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
   checkForUpdate();
 });
+
+// onInstalled only fires on first load / version bump, not every browser
+// launch -- onStartup covers the normal "opened the browser today" case.
+chrome.runtime.onStartup.addListener(() => checkForUpdate());
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SYNC_ALARM) runSyncPass();

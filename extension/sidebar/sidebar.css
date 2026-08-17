@@ -49,6 +49,7 @@ body {
 }
 
 .rail-btn {
+  position: relative;
   width: 34px;
   height: 34px;
   display: flex;
@@ -60,6 +61,17 @@ body {
   color: var(--muted-fg);
   cursor: pointer;
   flex-shrink: 0;
+}
+
+.rail-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--muted);
 }
 
 .rail-btn svg { width: 19px; height: 19px; }
@@ -277,6 +289,19 @@ body {
 
 .status-dot.ok { background: #4bae4f; }
 .status-dot.update { background: var(--accent); }
+.status-dot.error { background: #f34236; }
+.status-dot.ready { background: #2295f1; }
+
+.status-dot.downloading {
+  background: none;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  animation: lightmorphic-spin 0.8s linear infinite;
+}
+
+@keyframes lightmorphic-spin {
+  to { transform: rotate(360deg); }
+}
 
 .settings-form {
   display: flex;

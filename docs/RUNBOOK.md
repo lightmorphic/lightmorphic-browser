@@ -229,18 +229,70 @@
     there's no way for an extension to change the default while the
     browser is already running, only before first launch.
 
+- **AI Mode / "Ask Google" suppression, real update-dot system**
+  (2026-08-17). Charlie reported the omnibox showing "AI Mode" and "Ask
+  Google about this page" — confirmed live against the actual shipped
+  151.x version (an older local test build didn't have it; this isn't
+  gated behind Google API keys the way some things are, it's built into
+  vanilla open-source Chromium's UI now). Fixed with
+  `--disable-features=AiMode,LensOverlay,LensStandalone,ComposeUI,LinkedServicesSetting,PageContentAnnotations,GeminiInChromeSidePanel,GlicIntegration,Glic,TabOrganization,HistoryEmbeddings`
+  — verified by actually launching with the flags and confirming the
+  button/chip are gone, not by assuming the flag names work.
+  - **Real update-dot system** added to the sidebar's Settings panel
+    (house style: green/yellow/spinning-ring/blue/red), replacing the
+    toolbar-badge-only version. Caught and fixed a real bug while
+    building it: the original check compared the *extension's own*
+    manifest version against the GitHub release tag, which would never
+    match (`v0.1.0` vs `v151.0.7922.137`) and would have shown "update
+    available" permanently even when fully current. Fixed with
+    `version.json`, written by `build.sh` with the actual release tag
+    each AppImage was built from, and background.js compares against
+    that instead. Verified both states for real: built matching the
+    current release tag → confirmed "Up to date" (green, no rail dot);
+    the click-to-download path uses `chrome.downloads` for a real file
+    download. Honest limit, stated in the UI itself rather than
+    overclaimed: an extension can't safely replace the running AppImage
+    from inside the sandbox (no filesystem access beyond Downloads, no
+    exec permission) — download is real, the "ready" state tells the
+    user to swap the file and relaunch rather than claiming a silent
+    self-update that isn't actually built.
+- **Confirmed a hard branding ceiling** — Charlie pointed out the profile
+  menu says "Your Chromium" / "Add Chromium profile" / "Manage Chromium
+  profiles", and "Google services settings" is a native menu item.
+  Verified live: this is real, and it's not fixable by any flag, policy,
+  or Preferences seed. These strings come from Chromium's own compiled
+  `.grd` resource files (`IDS_PRODUCT_NAME` etc.) — changing them needs
+  editing those source files and a full rebuild, the same "100GB+ disk,
+  many hours, specialized infrastructure" ceiling already ruled out for
+  this project (see the ungoogled-chromium revert entry above). This
+  applies equally to the other standing ask — a permanently pinned,
+  un-unpinnable toolbar icon "that looks like it's part of the browser" —
+  toolbar pin state is user-controlled by Chromium design with no
+  extension-level override; a forced pin needs either root-owned
+  enterprise policy (`ExtensionSettings.toolbar_pin`, requires writing to
+  `/etc/.../policies/managed`, which this project has deliberately
+  avoided since it would need sudo on every install) or, again, a real
+  source-level fork. **Not attempted further this round** — flagged to
+  Charlie as a scope decision rather than silently worked around.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
   state (`pinned_extensions` is right, confirmed by diffing a manual
   pin, but doesn't reliably paint on first render). One manual pin click
   may still be needed the first time.
+- "Chromium" branding in native UI surfaces (profile menu, About page,
+  etc.) and a forced/un-unpinnable toolbar icon — confirmed not
+  achievable without a real source-level Chromium fork; see above.
 - Extensions-list sync (only bookmarks/settings/snippets collections are
   wired into the UI so far; `extensions` collection exists server-side
   but nothing populates it yet).
 - Passphrase change / account recovery UX (by design there is no
   recovery, but there's no "forget this device" or multi-device
   re-login flow built yet beyond the existing-account login path).
+- Update system downloads the new AppImage for real but can't self-apply
+  it (swap the file + relaunch) — no native-messaging helper built yet
+  to bridge that gap.
 
 ## Chromium version tracking
 

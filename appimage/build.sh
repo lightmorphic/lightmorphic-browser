@@ -66,6 +66,13 @@ mv "$APPDIR/usr/bin/chrome-linux" "$APPDIR/usr/bin/chromium"
 
 echo "==> Bundling extension"
 cp -r "$ROOT/extension/." "$APPDIR/usr/share/lightmorphic-browser/extension/"
+# The extension's own manifest version (extension/manifest.json) tracks
+# the extension's code, not the bundled Chromium release -- comparing
+# that against the GitHub release tag would always mismatch and show
+# "update available" even when fully current. This file records what
+# release this AppImage actually was, for the update check to compare
+# against instead.
+echo "{\"releaseTag\": \"v${CHROMIUM_VERSION}\"}" > "$APPDIR/usr/share/lightmorphic-browser/extension/version.json"
 
 echo "==> Bundling theme"
 # A separate package, not a "theme" key merged into the main extension's
@@ -168,7 +175,19 @@ fi
 #                                      stops Safe Browsing's client-side
 #                                      phishing-detection network traffic
 #   --disable-features=...            Translate (no Google Translate ping),
-#                                      OptimizationHints, AutofillServerCommunication
+#                                      OptimizationHints, AutofillServerCommunication,
+#                                      and (as of the 151.x line) AiMode/LensOverlay/
+#                                      Glic/ComposeUI/HistoryEmbeddings -- the
+#                                      "AI Mode" omnibox button and "Ask Google
+#                                      about this page" chip. These aren't
+#                                      gated behind Google API keys the way
+#                                      some other features are -- they're
+#                                      built into vanilla open-source Chromium
+#                                      itself now. Verified removed by
+#                                      actually launching with these flags on
+#                                      an isolated display and confirming the
+#                                      button/chip are gone, not by assuming
+#                                      the flag names are right.
 #   --disable-search-engine-choice-screen
 #                                      skips the upstream search-engine
 #                                      prompt (cosmetic, not itself a privacy
@@ -181,7 +200,7 @@ exec "$HERE/usr/bin/chromium/chrome" \
   --disable-sync \
   --disable-domain-reliability \
   --disable-client-side-phishing-detection \
-  --disable-features=Translate,OptimizationHints,AutofillServerCommunication \
+  --disable-features=Translate,OptimizationHints,AutofillServerCommunication,AiMode,LensOverlay,LensStandalone,ComposeUI,LinkedServicesSetting,PageContentAnnotations,GeminiInChromeSidePanel,GlicIntegration,Glic,TabOrganization,HistoryEmbeddings \
   --disable-search-engine-choice-screen \
   --apps-gallery-url="https://webstore-proxy.lightmorphic.co.uk/webstore" \
   --apps-gallery-update-url="https://webstore-proxy.lightmorphic.co.uk/service/update2/crx" \

@@ -13,6 +13,63 @@ for (const btn of document.querySelectorAll(".rail-btn")) {
   });
 }
 
+// ---- Update ----
+// House style: green = up to date, yellow = update available (click to
+// download), hollow ring = downloading, blue = ready (click applies the
+// downloaded AppImage isn't possible from extension code -- see below --
+// so this state instead tells the user how to finish it), red = can't
+// connect. State lives in chrome.storage, set by background.js so the
+// check logic isn't duplicated here.
+const appUpdateDot = document.getElementById("appUpdateDot");
+const railUpdateDot = document.getElementById("railUpdateDot");
+const updateStatusText = document.getElementById("updateStatusText");
+const updateActionBtn = document.getElementById("updateActionBtn");
+const updateHint = document.getElementById("updateHint");
+
+function renderUpdateStatus(status) {
+  const state = status?.state || "checking";
+  appUpdateDot.className = "status-dot";
+  updateActionBtn.hidden = true;
+  updateHint.textContent = "";
+  railUpdateDot.hidden = state !== "available" && state !== "ready";
+
+  if (state === "checking") {
+    updateStatusText.textContent = "Checking for updates…";
+  } else if (state === "ok") {
+    appUpdateDot.classList.add("ok");
+    updateStatusText.textContent = "Up to date";
+  } else if (state === "available") {
+    appUpdateDot.classList.add("update");
+    updateStatusText.textContent = `Update available (${status.latestTag})`;
+    updateActionBtn.hidden = false;
+    updateActionBtn.textContent = "Download update";
+  } else if (state === "downloading") {
+    appUpdateDot.classList.add("downloading");
+    updateStatusText.textContent = "Downloading…";
+  } else if (state === "ready") {
+    appUpdateDot.classList.add("ready");
+    updateStatusText.textContent = "Downloaded and ready";
+    updateHint.textContent =
+      "Saved to your Downloads folder. An extension can't replace the running AppImage itself -- quit, swap the old file for the new one, and relaunch.";
+  } else {
+    appUpdateDot.classList.add("error");
+    updateStatusText.textContent = "Couldn't check for updates";
+  }
+}
+
+async function loadUpdateStatus() {
+  const { updateStatus } = await chrome.storage.local.get("updateStatus");
+  renderUpdateStatus(updateStatus);
+}
+
+updateActionBtn.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "lightmorphic-download-update" });
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.updateStatus) renderUpdateStatus(changes.updateStatus.newValue);
+});
+
 // ---- Search engine ----
 document.getElementById("changeSearchEngineBtn").addEventListener("click", () => {
   chrome.tabs.create({ url: "chrome://settings/searchEngines" });
@@ -207,7 +264,7 @@ addSnippetForm.addEventListener("submit", async (e) => {
 
 // ---- Status row ----
 async function loadStatus() {
-  const dot = document.getElementById("updateDot");
+  const dot = document.getElementById("syncStatusDot");
   const text = document.getElementById("statusText");
   const configured = await isConfigured();
   dot.className = `status-dot ${configured ? "ok" : ""}`;
@@ -241,6 +298,7 @@ loadWebPanels();
 loadBookmarks();
 loadSnippets();
 loadStatus();
+loadUpdateStatus();
 
 chrome.bookmarks.onCreated.addListener(loadBookmarks);
 chrome.bookmarks.onRemoved.addListener(loadBookmarks);

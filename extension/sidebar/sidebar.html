@@ -21,8 +21,9 @@
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.2"/><path d="M8 3.5h4a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M7.5 9h5M7.5 12h5"/></svg>
       </button>
       <div class="rail-spacer"></div>
-      <button class="rail-btn" data-panel="settings" role="tab" aria-selected="false" title="Settings">
+      <button class="rail-btn rail-btn-settings" data-panel="settings" role="tab" aria-selected="false" title="Settings">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 3.5v2M10 14.5v2M16.5 10h-2M5.5 10h-2M14.6 5.4l-1.4 1.4M6.8 13.2l-1.4 1.4M14.6 14.6l-1.4-1.4M6.8 6.8 5.4 5.4"/></svg>
+        <span class="rail-dot" id="railUpdateDot" hidden></span>
       </button>
     </nav>
 
@@ -66,6 +67,14 @@
       </section>
 
       <section id="panel-settings" class="panel-view">
+        <h2 class="settings-heading">Update</h2>
+        <div class="status-row" id="updateStatusRow">
+          <span class="status-dot" id="appUpdateDot"></span>
+          <span id="updateStatusText">Checking&hellip;</span>
+        </div>
+        <button id="updateActionBtn" class="btn-secondary" type="button" hidden></button>
+        <p class="hint" id="updateHint"></p>
+
         <h2 class="settings-heading">Search engine</h2>
         <div class="status-row">
           <span class="status-dot ok"></span>
@@ -76,7 +85,7 @@
 
         <h2 class="settings-heading">Sync</h2>
         <div class="status-row" id="statusRow">
-          <span class="status-dot" id="updateDot"></span>
+          <span class="status-dot" id="syncStatusDot"></span>
           <span id="statusText">Sync not set up</span>
         </div>
         <form id="syncSetupForm" class="settings-form">
