@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
-# Native-messaging host for LMB. Handles two things the extension sandbox
-# can't do itself:
+# Native-messaging host for LMB. Handles the one thing the extension
+# sandbox can't do itself -- install a downloaded update in place:
 #   {"action":"install","new":"<path>"}  -> swap the AppImage + restart
-#   {"action":"set-theme","mode":"light|dark"} -> record the browser theme
-#                                                  mode + restart (so the
-#                                                  whole browser chrome,
-#                                                  not just the sidebar,
-#                                                  changes light/dark)
 # Restart = SIGTERM the browser (clean, tabs restored by "continue where
 # you left off") + a detached relauncher that waits for it to exit then
-# starts the (new / re-themed) binary.
+# starts the new binary.
 #
 # Pure bash + coreutils only -- no python/node assumed on the user's box.
 set -euo pipefail
@@ -84,16 +79,6 @@ case "$action" in
     cp -f "$new_path" "$tmp"; chmod +x "$tmp"; mv -f "$tmp" "$target"
     echo "swapped $target" >&2
     restart_browser
-    ;;
-  set-theme)
-    # Persist the preference ONLY -- do NOT restart. Forcing a whole
-    # browser restart on a colour toggle was fragile and left the
-    # relaunched browser broken. The sidebar recolours instantly (CSS);
-    # the browser chrome picks up this file on the next normal launch.
-    mode=$(field mode)
-    [ "$mode" = "light" ] || mode="dark"
-    printf '%s' "$mode" > "${USER_DATA_DIR}/theme-mode"
-    echo "theme-mode set to $mode (no restart)" >&2
     ;;
   *)
     echo "unknown action" >&2

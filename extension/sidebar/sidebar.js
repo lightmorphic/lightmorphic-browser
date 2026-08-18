@@ -117,31 +117,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.updateStatus) renderUpdateStatus(changes.updateStatus.newValue);
 });
 
-// ---- Light / dark toggle ----
-// Straight light <-> dark (default dark). The sidebar recolours instantly
-// via data-theme (CSS). The preference is also persisted for the launcher
-// (via the native host writing a theme-mode file) so the whole browser
-// chrome -- tabs/toolbar -- switches on the NEXT launch. It deliberately
-// does NOT force a restart: doing that on a colour toggle was fragile and
-// left the browser broken.
-const railThemeToggle = document.getElementById("railThemeToggle");
-
-function applyTheme(mode) {
-  document.documentElement.setAttribute("data-theme", mode === "light" ? "light" : "dark");
-}
-
-async function loadTheme() {
-  const { themeMode } = await chrome.storage.local.get("themeMode");
-  applyTheme(themeMode || "dark");
-}
-
-railThemeToggle.addEventListener("click", async () => {
-  const { themeMode } = await chrome.storage.local.get("themeMode");
-  const next = (themeMode || "dark") === "dark" ? "light" : "dark";
-  await chrome.storage.local.set({ themeMode: next });
-  applyTheme(next); // sidebar updates immediately
-  chrome.runtime.sendMessage({ type: "lightmorphic-set-theme", mode: next }); // persists for next launch
-});
+// The sidebar always uses the dark theme to match the browser's branded
+// dark chrome. (A user-facing light/dark toggle was removed: an extension
+// cannot repaint the browser chrome at runtime -- only the sidebar -- and
+// the only way to change the chrome is a full restart, which was fragile.
+// So rather than a control that only themes the panel, there is none.)
+document.documentElement.setAttribute("data-theme", "dark");
 
 // ---- Search engine ----
 document.getElementById("changeSearchEngineBtn").addEventListener("click", () => {
@@ -471,7 +452,6 @@ loadBookmarks();
 loadSnippets();
 loadStatus();
 loadUpdateStatus();
-loadTheme();
 
 chrome.bookmarks.onCreated.addListener(loadBookmarks);
 chrome.bookmarks.onRemoved.addListener(loadBookmarks);

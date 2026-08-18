@@ -227,27 +227,10 @@ async function installUpdate() {
   }
 }
 
-// Whole-browser light/dark: the sidebar can only theme itself with CSS;
-// the browser chrome (tabs/toolbar) is set by which theme package the
-// launcher loads. So hand the chosen mode to the native host, which
-// records it and restarts the browser with the matching theme. Best
-// effort -- if the host isn't reachable, the sidebar still changed and
-// the chrome will follow on the next manual launch.
-function setBrowserTheme(mode) {
-  try {
-    const port = chrome.runtime.connectNative("co.lightmorphic.updater");
-    port.onDisconnect.addListener(() => void chrome.runtime.lastError);
-    port.postMessage({ action: "set-theme", mode });
-  } catch {
-    /* host unavailable -- sidebar-only change persists, chrome follows next launch */
-  }
-}
-
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "lightmorphic-download-update") downloadUpdate();
   if (message?.type === "lightmorphic-check-update") checkForUpdate();
   if (message?.type === "lightmorphic-install-update") installUpdate();
-  if (message?.type === "lightmorphic-set-theme") setBrowserTheme(message.mode);
   return false;
 });
 

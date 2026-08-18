@@ -470,6 +470,21 @@
     enterprise policy (root) or a source fork -- out of scope, as noted
     earlier.
 
+- **v0.10: removed light/dark entirely** (2026-08-18). An instant
+  whole-browser light/dark toggle is genuinely impossible from an
+  extension: Chromium has no runtime API to repaint the browser chrome
+  (tabs/toolbar/menus) -- the theme is fixed at launch by the loaded theme
+  package, and the only way to change it is a full restart (which was the
+  crash source). A toggle that only recolours the sidebar panel is
+  pointless, so per Charlie's instruction ("if it's not possible at all,
+  then remove light and dark") it was removed: no rail toggle, sidebar
+  always dark to match the branded dark chrome. Stripped the theme-light
+  package, the AppRun theme-mode selection, the native host set-theme
+  action, and the background set-theme handler. The native host now does
+  one job (install updates). Verified the browser opens clean, dark, and
+  consistent with no toggle. This closes the light/dark thread -- it is
+  not a "not yet built" item, it's confirmed not achievable in a wrapper.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
