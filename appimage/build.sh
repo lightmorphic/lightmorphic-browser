@@ -125,11 +125,39 @@ echo "==> Writing launcher"
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/usr/bin/env bash
 HERE="$(dirname "$(readlink -f "${0}")")"
-EXT="$HERE/usr/share/lightmorphic-browser/extension"
-THEME="$HERE/usr/share/lightmorphic-browser/theme"
-LOAD_PATHS="$EXT,$THEME"
+EXT_SRC="$HERE/usr/share/lightmorphic-browser/extension"
+THEME_SRC="$HERE/usr/share/lightmorphic-browser/theme"
 USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
 PROFILE_DIR="$USER_DATA_DIR/Default"
+
+# --- Load the extension from a WRITABLE copy, not the AppImage mount.
+# Chromium indexes the extension's declarativeNetRequest static rulesets
+# (LMB Shield's ad/tracker filters) into <extension>/_metadata/ the first
+# time the extension loads. The AppImage's own files live on a read-only
+# squashfs mount, so that write fails and Chromium aborts the ENTIRE
+# extension load with "easylist.json: Internal error while parsing rules"
+# -- taking the whole sidebar down with it, not just Shield. (Reproduced
+# exactly by loading the extension from a chmod a-w directory.) So copy
+# the extension + theme into the profile dir, which is writable, and load
+# from there. Re-copy only when the bundled release changes, so normal
+# launches stay fast and a browser update actually ships new extension
+# code. The extension's fixed manifest "key" keeps its ID stable
+# regardless of load path, so pinned state / native-host origin / DNR all
+# still line up.
+RUNTIME_DIR="$USER_DATA_DIR/runtime"
+EXT="$RUNTIME_DIR/extension"
+THEME="$RUNTIME_DIR/theme"
+STAMP="$RUNTIME_DIR/.bundled-version"
+WANT_VER="$(cat "$EXT_SRC/version.json" 2>/dev/null)"
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$WANT_VER" ]; then
+  rm -rf "$EXT" "$THEME"
+  mkdir -p "$RUNTIME_DIR"
+  cp -r "$EXT_SRC" "$EXT"
+  cp -r "$THEME_SRC" "$THEME"
+  chmod -R u+w "$EXT" "$THEME"
+  printf '%s' "$WANT_VER" > "$STAMP"
+fi
+LOAD_PATHS="$EXT,$THEME"
 
 # --- Self-updater plumbing (for the "click blue to install & restart"
 # flow). The extension talks to a native-messaging host that swaps the
@@ -363,6 +391,41 @@ if [ -z "$GENERATED" ]; then
 fi
 mv "$GENERATED" "$DIST/$FINAL_NAME"
 chmod +x "$DIST/$FINAL_NAME"
+
+# --- Post-build smoke test: run the REAL AppRun against a read-only tree
+# and confirm the extension actually loads. This is the gate that was
+# missing when v0.14 shipped broken: the extension loaded fine in every
+# writable-dir test, but in the real AppImage its DNR rulesets couldn't be
+# indexed onto the read-only squashfs mount, so the whole extension (sidebar
+# and all) failed with "easylist.json: Internal error while parsing rules".
+# We can't mount the AppImage without FUSE in CI, so extract it, make the
+# tree read-only to mimic the mount, and run its AppRun headless -- AppRun's
+# copy-to-writable step is exactly what's under test. A broken AppRun (or a
+# genuinely invalid ruleset) trips the grep and fails the build.
+echo "==> Post-build smoke test: launching AppRun from a read-only tree"
+SMOKE_DIR=$(mktemp -d)
+SMOKE_HOME="$SMOKE_DIR/home"
+mkdir -p "$SMOKE_HOME"
+( cd "$SMOKE_DIR" && "$DIST/$FINAL_NAME" --appimage-extract >/dev/null 2>&1 )
+if [ -x "$SMOKE_DIR/squashfs-root/AppRun" ]; then
+  chmod -R a-w "$SMOKE_DIR/squashfs-root"    # mimic the read-only mount
+  HOME="$SMOKE_HOME" APPIMAGE="$DIST/$FINAL_NAME" timeout 60 \
+    "$SMOKE_DIR/squashfs-root/AppRun" \
+    --headless=new --no-sandbox --disable-gpu \
+    --enable-logging=stderr --v=1 about:blank \
+    >"$SMOKE_DIR/log.txt" 2>&1 || true
+  chmod -R u+w "$SMOKE_DIR/squashfs-root" 2>/dev/null || true
+  if grep -qiE "Internal error while parsing rules|Failed to load extension" "$SMOKE_DIR/log.txt"; then
+    echo "==> SMOKE TEST FAILED: extension does not load from the real AppImage:" >&2
+    grep -iE "Failed to load extension|parsing rules|rule.*invalid" "$SMOKE_DIR/log.txt" >&2
+    rm -rf "$SMOKE_DIR"
+    exit 1
+  fi
+  echo "==> Smoke test passed: extension + Shield load from a read-only tree"
+else
+  echo "==> WARNING: could not extract AppImage for smoke test; skipping" >&2
+fi
+rm -rf "$SMOKE_DIR"
 
 echo "$CHROMIUM_VERSION" > "$ROOT/appimage/last-built-version.txt"
 echo "==> Done: dist/$FINAL_NAME (release tag ${RELEASE_TAG})"

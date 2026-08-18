@@ -570,6 +570,32 @@
   test PDF with the switch on. Added to AppRun launch flags. Directly serves
   the "Google must be completely stripped" requirement.
 
+- **v0.15: FIX -- v0.14 shield rulesets bricked the whole extension in the
+  real AppImage** (2026-08-18). v0.14 loaded fine in every headless test but
+  failed on the user's actual install: *"Failed to load extension from:
+  /tmp/.mount_lmb_.../extension. easylist.json: Internal error while parsing
+  rules."* -- and because a bad static ruleset fails the ENTIRE extension
+  load, the whole sidebar went with it. Root cause: Chromium indexes DNR
+  static rulesets into `<extension>/_metadata/generated_indexed_rulesets/`
+  the first time the extension loads, but the AppImage's files sit on a
+  read-only squashfs mount, so that write fails and the load aborts. Every
+  test had used a writable temp dir via `--load-extension`, so it never
+  surfaced. Reproduced deterministically by loading the extension from a
+  `chmod a-w` directory -> exact same error. Fix: AppRun now copies the
+  extension + theme into `$USER_DATA_DIR/runtime/` (writable) and loads from
+  there, re-copying only when the bundled version changes. Verified: with a
+  read-only source, loading from the writable copy has NO parse error, both
+  rulesets enable, blocking works, and the indexed rulesets land in the
+  copy's `_metadata/` while the source stays clean. The fixed manifest "key"
+  keeps the extension ID stable across the path change, so pinned state /
+  native-host origin / DNR session rules all still line up.
+  NOTE: v0.14's in-app updater is dead (its background.js never loads), so
+  affected users must MANUALLY download v0.15 -- the green-circle update
+  can't rescue them.
+  GAP to close: CI never load-tested the packaged extension, which is how a
+  broken build shipped. Worth adding a headless "does the extension load
+  from a read-only copy" smoke test to build.sh/CI.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
