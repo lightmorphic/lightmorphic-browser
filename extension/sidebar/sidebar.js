@@ -117,12 +117,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.updateStatus) renderUpdateStatus(changes.updateStatus.newValue);
 });
 
-// The sidebar always uses the dark theme to match the browser's branded
-// dark chrome. (A user-facing light/dark toggle was removed: an extension
-// cannot repaint the browser chrome at runtime -- only the sidebar -- and
-// the only way to change the chrome is a full restart, which was fragile.
-// So rather than a control that only themes the panel, there is none.)
-document.documentElement.setAttribute("data-theme", "dark");
+// The sidebar follows the browser's own light/dark mode automatically via
+// the CSS prefers-color-scheme media query (see sidebar.css) -- no
+// hardcoded theme and no toggle. Browser in dark mode -> dark panel;
+// browser in light mode -> light panel; auto -> whatever the OS is.
 
 // ---- Search engine ----
 document.getElementById("changeSearchEngineBtn").addEventListener("click", () => {

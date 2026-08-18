@@ -11,23 +11,16 @@
   --tip-bg: #111827; --tip-fg: #ffffff;
 }
 
-/* Dark values. Applied when the OS prefers dark AND the user hasn't
-   forced light, OR when the user explicitly picks dark via the rail
-   toggle -- so a manual choice always wins over the OS setting. */
+/* Follow the browser's own light/dark mode automatically -- the panel is
+   dark when the browser is dark, light when it's light, and tracks the OS
+   on "auto". Standard prefers-color-scheme, no toggle, no override. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     --bg: #09090b; --fg: #fafafa;
     --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
     --border: #27272a; --muted: #1c1c1f; --muted-fg: #a1a1aa;
     --tip-bg: #fafafa; --tip-fg: #111827;
   }
-}
-
-:root[data-theme="dark"] {
-  --bg: #09090b; --fg: #fafafa;
-  --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
-  --border: #27272a; --muted: #1c1c1f; --muted-fg: #a1a1aa;
-  --tip-bg: #fafafa; --tip-fg: #111827;
 }
 
 * { box-sizing: border-box; }
