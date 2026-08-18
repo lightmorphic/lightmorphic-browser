@@ -35,11 +35,13 @@ REPLACEMENTS = [
     # are rewritten.
     (b"Google services settings", b"Account services settings"),
     (b"Google Password Manager", b"Password Manager"),
-    (b"Google Chrome", b"Lightmorphic Browser"),
-    (b"Chromium", b"Lightmorphic Browser"),
+    # Short form "LMB" everywhere per Charlie's naming call -- these are
+    # menu items and inline sentences, not explanatory surfaces.
+    (b"Google Chrome", b"LMB"),
+    (b"Chromium", b"LMB"),
     # Bare "Chrome" appears in some strings ("Chrome preloads pages...").
     # Replace after the longer forms so it only catches leftovers.
-    (b"Chrome", b"Lightmorphic Browser"),
+    (b"Chrome", b"LMB"),
 ]
 
 

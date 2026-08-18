@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Lightmorphic Browser",
+  "name": "LMB",
   "version": "0.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAstCsQ3tdcEf2QX8uZ9A292x6NE3w3flRv9K8g43cX2UEPsTexc6FXiJiSlpImDgnY+3SDV8HPRXGpdrJkO8gocoJokjUkVkyOk9KrKOIbb5YEumPgsslHoxXxpsK/HTIh/ygxwqafafvd7VFk3qun5EiuWa2Rt1RKUd52dWF+AiCbZzQvij07aEE0Ja2+uIm7r5/nq0pBZhWHhZXFSUWL6xDh/DXThMARgK9gFSt5v9GC5U0yYEAohrSJw+c3dfU8i1bzYuwuK9q2XvrU6TiE1lis+DSxIAhlGGwxHrm2Ob3fMYJfGzlEtEBEMbh722Bl4RNf+K5l7208gy9RW7qYQIDAQAB",
-  "description": "Sidebar, quick-paste, and end-to-end encrypted sync for Lightmorphic Browser.",
+  "description": "Sidebar, quick-paste, and end-to-end encrypted sync for LMB (Lightmorphic Browser).",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -15,7 +15,7 @@
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"
     },
-    "default_title": "Lightmorphic Browser"
+    "default_title": "LMB"
   },
   "background": {
     "service_worker": "background.js",

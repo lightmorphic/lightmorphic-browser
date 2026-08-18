@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+HERE="$(dirname "$(readlink -f "${0}")")"
+EXT="$HERE/usr/share/lightmorphic-browser/extension"
+THEME="$HERE/usr/share/lightmorphic-browser/theme"
+LOAD_PATHS="$EXT,$THEME"
+USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
+PROFILE_DIR="$USER_DATA_DIR/Default"
+
+# Extension has a fixed "key" in its manifest (see extension/manifest.json)
+# so its ID is stable (hokpgjhmbdcggofdeaaobeknogcmlbfa) instead of
+# derived from the load path. Two things get pre-seeded into the profile's
+# own Preferences file, verified empirically (via a real headful launch on
+# an isolated nested X display, not guessed) against this Chromium build,
+# only on a genuine first run so a user's own later choices aren't fought:
+#
+# 1. pinned_extensions -- the real top-level key (NOT nested under
+#    "extensions", despite that being the more "logical" guess that
+#    silently did nothing when tried first). Confirmed correct by manually
+#    pinning via the UI and diffing the file, but pre-seeding it before
+#    first launch did not reliably paint the icon on first render in
+#    testing -- worth keeping since it's the genuinely correct value, but
+#    a user may still need one manual pin click the very first time.
+# 2. extensions.ui.developer_mode -- this is the more important fix. An
+#    extension loaded via --load-extension survives the FIRST launch, but
+#    gets silently DISABLED on a reload/relaunch ("Turn on developer mode
+#    to use this extension") unless developer mode is already on. This
+#    reproduces exactly what looked like "the extension just isn't there"
+#    on a second run -- confirmed by watching it happen (toggle flips off,
+#    warning banner appears) and fixed by pre-enabling developer mode.
+# 3. default_search_provider_data -- sets DuckDuckGo (not Google) as the
+#    actual default search engine from first launch. Verified empirically:
+#    launched with this seeded, confirmed the omnibox placeholder read
+#    "Search DuckDuckGo or type a URL", then actually typed a query and
+#    confirmed it navigated to duckduckgo.com, not Google. There's no
+#    extension API to do this on Linux (chrome_settings_overrides'
+#    search_provider is Windows/Mac only per Chrome's own docs), so this
+#    is the only reliable mechanism -- and it only applies pre-first-run,
+#    which is exactly when this file is written.
+# 4. signin.allowed / allowed_on_next_startup false -- removes the
+#    sign-in-to-Google surfaces. Single-profile mode comes from Local
+#    State (a separate file at the user-data-dir root):
+#    profile.add_person_enabled=false removes "Add profile",
+#    profile.browser_guest_enabled=false removes "Open guest profile" --
+#    both verified gone from the profile menu in a live test. "Manage
+#    profiles" has no pref-level switch and remains (documented gap).
+if [ ! -f "$PROFILE_DIR/Preferences" ]; then
+  mkdir -p "$PROFILE_DIR"
+  cat > "$USER_DATA_DIR/Local State" <<'LOCALSTATE'
+{
+  "profile": {
+    "add_person_enabled": false,
+    "browser_guest_enabled": false
+  }
+}
+LOCALSTATE
+  cat > "$PROFILE_DIR/Preferences" <<'PREFS'
+{
+  "pinned_extensions": ["hokpgjhmbdcggofdeaaobeknogcmlbfa"],
+  "extensions": {
+    "ui": {
+      "developer_mode": true
+    }
+  },
+  "signin": {
+    "allowed": false,
+    "allowed_on_next_startup": false
+  },
+  "default_search_provider_data": {
+    "template_url_data": {
+      "short_name": "DuckDuckGo",
+      "keyword": "duckduckgo.com",
+      "url": "https://duckduckgo.com/?q={searchTerms}",
+      "suggestions_url": "https://duckduckgo.com/ac/?q={searchTerms}&type=list",
+      "favicon_url": "https://duckduckgo.com/favicon.ico",
+      "safe_for_autoreplace": false,
+      "input_encodings": ["UTF-8"],
+      "id": "2000",
+      "prepopulate_id": 0,
+      "is_active": 1
+    }
+  }
+}
+PREFS
+fi
+
+# Extension installs are routed through the Lightmorphic Web Store proxy
+# instead of talking to Google's gallery/update servers directly.
+#
+# --load-extension alone is unreliable: recent Chromium versions show a
+# "extensions loaded via command line will be removed unless Developer
+# Mode is on" infobar and can silently drop the extension on next
+# restart. --disable-extensions-except pins it as an explicitly-allowed
+# extension instead, which is the combination Selenium/Puppeteer use for
+# exactly this reason.
+#
+# Privacy hardening (owned by us, not a third-party project): stock
+# open-source Chromium already lacks Google's proprietary API keys, but
+# still talks to Google for a handful of things by default. These are
+# documented, real Chromium switches -- not guessed preference keys:
+#   --disable-background-networking   stops most background Google network
+#                                      traffic (component updater pings etc.)
+#   --disable-sync                    Chrome Sync entirely off
+#   --disable-domain-reliability      stops domain-reliability monitoring
+#                                      pings (goes to Google infrastructure)
+#   --disable-client-side-phishing-detection
+#                                      stops Safe Browsing's client-side
+#                                      phishing-detection network traffic
+#   --disable-features=...            Translate (no Google Translate ping),
+#                                      OptimizationHints, AutofillServerCommunication,
+#                                      and (as of the 151.x line) AiMode/LensOverlay/
+#                                      Glic/ComposeUI/HistoryEmbeddings -- the
+#                                      "AI Mode" omnibox button and "Ask Google
+#                                      about this page" chip. These aren't
+#                                      gated behind Google API keys the way
+#                                      some other features are -- they're
+#                                      built into vanilla open-source Chromium
+#                                      itself now. Verified removed by
+#                                      actually launching with these flags on
+#                                      an isolated display and confirming the
+#                                      button/chip are gone, not by assuming
+#                                      the flag names are right.
+#   --disable-search-engine-choice-screen
+#                                      skips the upstream search-engine
+#                                      prompt (cosmetic, not itself a privacy
+#                                      fix)
+exec "$HERE/usr/bin/chromium/chrome" \
+  --load-extension="$LOAD_PATHS" \
+  --disable-extensions-except="$LOAD_PATHS" \
+  --user-data-dir="$USER_DATA_DIR" \
+  --disable-background-networking \
+  --disable-sync \
+  --disable-domain-reliability \
+  --disable-client-side-phishing-detection \
+  --disable-features=Translate,OptimizationHints,AutofillServerCommunication,AiMode,LensOverlay,LensStandalone,ComposeUI,LinkedServicesSetting,PageContentAnnotations,GeminiInChromeSidePanel,GlicIntegration,Glic,TabOrganization,HistoryEmbeddings \
+  --disable-search-engine-choice-screen \
+  --apps-gallery-url="https://webstore-proxy.lightmorphic.co.uk/webstore" \
+  --apps-gallery-update-url="https://webstore-proxy.lightmorphic.co.uk/service/update2/crx" \
+  --apps-gallery-download-url="https://webstore-proxy.lightmorphic.co.uk/crx/%s.crx" \
+  "$@"

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Lightmorphic Theme",
+  "name": "LMB Theme",
   "version": "0.1.0",
-  "description": "Navy and yellow browser theme matching Lightmorphic Browser.",
+  "description": "Navy and yellow browser theme matching LMB (Lightmorphic Browser).",
   "theme": {
     "colors": {
       "frame": [17, 24, 39],

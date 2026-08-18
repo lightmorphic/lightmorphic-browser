@@ -87,6 +87,29 @@ body {
 
 .rail-spacer { flex: 1; }
 
+.rail-divider {
+  width: 22px;
+  border-top: 1px solid var(--border);
+  margin: 0.375rem 0;
+  flex-shrink: 0;
+}
+
+.rail-sites {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  overflow-y: auto;
+  max-height: 40%;
+  flex-shrink: 0;
+}
+
+.rail-site-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
 .content {
   flex: 1;
   min-width: 0;

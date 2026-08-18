@@ -157,17 +157,17 @@ async function checkForUpdate() {
       });
       chrome.action.setBadgeText({ text: "!" });
       chrome.action.setBadgeBackgroundColor({ color: "#FBC711" });
-      chrome.action.setTitle({ title: `Lightmorphic Browser -- update available (${release.tag_name})` });
+      chrome.action.setTitle({ title: `LMB -- update available (${release.tag_name})` });
     } else {
       await chrome.storage.local.set({ updateStatus: { state: "ok" } });
       chrome.action.setBadgeText({ text: "" });
-      chrome.action.setTitle({ title: "Lightmorphic Browser" });
+      chrome.action.setTitle({ title: "LMB" });
     }
   } catch {
     await chrome.storage.local.set({ updateStatus: { state: "error" } });
     chrome.action.setBadgeText({ text: "?" });
     chrome.action.setBadgeBackgroundColor({ color: "#9E9D9E" });
-    chrome.action.setTitle({ title: "Lightmorphic Browser -- couldn't check for updates" });
+    chrome.action.setTitle({ title: "LMB -- couldn't check for updates" });
   }
 }
 

@@ -119,8 +119,55 @@ async function pinUrl(url) {
   loadWebPanels();
 }
 
+// Pinned sites also render as favicon buttons in the rail itself
+// (Vivaldi-style), below the section icons with a "+" underneath.
+// Favicons come from DuckDuckGo's icon service, consistent with the
+// no-Google stance; a broken icon falls back to a plain dot glyph.
+const railSites = document.getElementById("railSites");
+const railAddSite = document.getElementById("railAddSite");
+
+function openPanelSite(url) {
+  document.querySelectorAll(".rail-btn[data-panel]").forEach((b) => {
+    const on = b.dataset.panel === "panels";
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  document.querySelectorAll(".panel-view").forEach((p) => {
+    p.classList.toggle("active", p.id === "panel-panels");
+  });
+  webPanelFrame.src = url;
+  webPanelFrame.hidden = false;
+}
+
+function renderRailSites(webPanels) {
+  railSites.innerHTML = "";
+  for (const url of webPanels) {
+    let host;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      continue;
+    }
+    const btn = document.createElement("button");
+    btn.className = "rail-btn";
+    btn.title = host;
+    const img = document.createElement("img");
+    img.className = "rail-site-icon";
+    img.src = `https://icons.duckduckgo.com/ip3/${host}.ico`;
+    img.alt = "";
+    img.addEventListener("error", () => {
+      img.remove();
+      btn.textContent = "•";
+    });
+    btn.appendChild(img);
+    btn.addEventListener("click", () => openPanelSite(url));
+    railSites.appendChild(btn);
+  }
+}
+
 async function loadWebPanels() {
   const { webPanels = [] } = await chrome.storage.local.get("webPanels");
+  renderRailSites(webPanels);
   webPanelList.innerHTML = "";
   for (const url of webPanels) {
     const item = document.createElement("div");
@@ -147,6 +194,13 @@ async function loadWebPanels() {
     webPanelList.appendChild(item);
   }
 }
+
+railAddSite.addEventListener("click", async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) return;
+  await pinUrl(tab.url);
+  openPanelSite(tab.url);
+});
 
 addPanelForm.addEventListener("submit", async (e) => {
   e.preventDefault();

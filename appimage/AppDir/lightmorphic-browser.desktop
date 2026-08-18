@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=LMB (Lightmorphic Browser)
+Name=Lightmorphic Browser
 Comment=Privacy-first browser built on Chromium
 Exec=AppRun %U
 Icon=lightmorphic-browser
@@ -8,3 +8,4 @@ Categories=Network;WebBrowser;
 Terminal=false
 StartupWMClass=lightmorphic-browser
 MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+X-AppImage-Version=0.02

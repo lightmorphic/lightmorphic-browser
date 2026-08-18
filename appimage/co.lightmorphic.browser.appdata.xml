@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>co.lightmorphic.browser</id>
-  <name>Lightmorphic Browser</name>
+  <name>LMB (Lightmorphic Browser)</name>
   <summary>Privacy-first browser built on Chromium, hardened against Google</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <description>
     <p>
-      Lightmorphic Browser is a privacy-first browser built on official
+      LMB (Lightmorphic Browser) is a privacy-first browser built on official
       open-source Chromium (not "Google Chrome"), with background
       networking, sync, domain reliability, and phishing-detection pings
       disabled by our own flags &#8212; not a third-party de-googling
