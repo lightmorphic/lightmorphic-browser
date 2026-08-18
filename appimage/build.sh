@@ -82,6 +82,21 @@ echo "==> Rebranding locale resources (Chromium -> Lightmorphic Browser)"
 # and the browser boots and runs normally on the repacked files.
 python3 "$ROOT/appimage/patch-pak.py" "$APPDIR/usr/bin/chromium/locales"
 
+echo "==> Compiling LMB Shield rulesets (EasyList + EasyPrivacy -> DNR)"
+# Ad/tracker blocking is built into LMB itself: the same GPLv3 filter lists
+# uBlock Origin uses, compiled into Chromium's native declarativeNetRequest
+# rulesets that the extension declares enabled-by-default. Rebuilding here
+# means every LMB release ships fresh filters. If the lists are briefly
+# unreachable, fall back to any rulesets already present so the build still
+# produces a working browser (just with the previous filters).
+if ! python3 "$ROOT/tools/build-shield-rules.py"; then
+  echo "==> WARNING: shield rule fetch failed; using existing rulesets if present" >&2
+  if [ ! -f "$ROOT/extension/shield/rules/easylist.json" ]; then
+    echo "==> ERROR: no shield rulesets available and fetch failed" >&2
+    exit 1
+  fi
+fi
+
 echo "==> Bundling extension"
 cp -r "$ROOT/extension/." "$APPDIR/usr/share/lightmorphic-browser/extension/"
 # The extension's own manifest version (extension/manifest.json) tracks
@@ -249,6 +264,20 @@ fi
 #   --disable-client-side-phishing-detection
 #                                      stops Safe Browsing's client-side
 #                                      phishing-detection network traffic
+#   --disable-component-extensions-with-background-pages
+#                                      As of the 151.x line, Chromium ships
+#                                      "Gemini in Chrome" as a built-in
+#                                      COMPONENT extension (id admccj...) with
+#                                      a background service worker -- it loads
+#                                      even with the Glic/Gemini feature flags
+#                                      off (verified: still present, then gone
+#                                      only with this switch). This disables
+#                                      component extensions that run background
+#                                      pages, which removes Gemini. Confirmed
+#                                      the built-in PDF viewer (also a component
+#                                      extension) STILL works with this on --
+#                                      a test PDF rendered fine -- so it's
+#                                      surgical, not a blanket break.
 #   --disable-features=...            Translate (no Google Translate ping),
 #                                      OptimizationHints, AutofillServerCommunication,
 #                                      and (as of the 151.x line) AiMode/LensOverlay/
@@ -281,6 +310,7 @@ exec "$HERE/usr/bin/chromium/chrome" \
   --disable-sync \
   --disable-domain-reliability \
   --disable-client-side-phishing-detection \
+  --disable-component-extensions-with-background-pages \
   --disable-features=Translate,OptimizationHints,AutofillServerCommunication,AiMode,LensOverlay,LensStandalone,ComposeUI,LinkedServicesSetting,PageContentAnnotations,GeminiInChromeSidePanel,GlicIntegration,Glic,TabOrganization,HistoryEmbeddings \
   --disable-search-engine-choice-screen \
   --apps-gallery-url="https://webstore-proxy.lightmorphic.co.uk/webstore" \

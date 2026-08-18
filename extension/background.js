@@ -234,6 +234,43 @@ chrome.runtime.onMessage.addListener((message) => {
   return false;
 });
 
+// ---- LMB Shield (ad / tracker blocking) ----
+// The blocking itself is done natively by Chromium's declarativeNetRequest
+// engine using static rulesets compiled from EasyList + EasyPrivacy (the
+// same lists uBlock Origin uses) -- see tools/build-shield-rules.py and
+// extension/shield/rules/. The rulesets are declared enabled:true in the
+// manifest, so protection is ON by default from first launch with zero
+// runtime cost. This code only honours the user's on/off choice: if they
+// turned Shield off, re-apply that on every startup (the manifest would
+// otherwise re-enable it).
+const SHIELD_RULESETS = ["easylist", "easyprivacy"];
+
+async function applyShieldState() {
+  const { shieldEnabled = true } = await chrome.storage.local.get("shieldEnabled");
+  try {
+    await chrome.declarativeNetRequest.updateEnabledRulesets(
+      shieldEnabled
+        ? { enableRulesetIds: SHIELD_RULESETS }
+        : { disableRulesetIds: SHIELD_RULESETS }
+    );
+  } catch {
+    /* ruleset ids not present (e.g. rules not built) -- nothing to toggle */
+  }
+}
+
+async function setShield(enabled) {
+  await chrome.storage.local.set({ shieldEnabled: enabled });
+  await applyShieldState();
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "lightmorphic-shield-set") {
+    setShield(!!message.enabled).then(() => sendResponse({ ok: true }));
+    return true; // async response
+  }
+  return false;
+});
+
 // ---- Sync poll ----
 async function syncCollection(name, localValue) {
   const { value: remoteValue, version } = await pull(name);
@@ -292,6 +329,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
   checkForUpdate();
+  await applyShieldState();
   await redirectStockNtp();
 });
 
@@ -299,6 +337,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 // launch -- onStartup covers the normal "opened the browser today" case.
 chrome.runtime.onStartup.addListener(async () => {
   checkForUpdate();
+  await applyShieldState();
   await redirectStockNtp();
 });
 

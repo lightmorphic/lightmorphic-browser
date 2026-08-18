@@ -511,6 +511,65 @@
   keeps the in-frame position instead of jumping to the pinned URL.
   Origin-checked (only messages from our extension origin are honoured).
 
+- **v0.14: LMB Shield -- built-in ad/tracker blocking** (2026-08-18).
+  The user asked for "your own version of uBlock Origin ... that will block
+  everything, same as Brave Shields or uBO," specifically the MV2 version.
+  Investigated MV2 empirically on the bundled Chromium 151 and it's a hard
+  dead end: sideloaded MV2 extensions are rejected outright ("Cannot install
+  extension because it uses an unsupported manifest version"), even with
+  `--allow-legacy-extension-manifests` AND the deprecation features disabled.
+  The only MV2 re-enable is an enterprise managed policy in
+  `/etc/chromium/policies/managed/` (root, per-machine) and Google is deleting
+  it on the 2025 timeline anyway -- so building the blocker on MV2 would break
+  the moment a user updates Chromium, violating the project's core
+  "stays easily updatable" rule. Also found in the binary:
+  "webRequestBlocking is only allowed for extensions ... installed using
+  ExtensionInstallForcelist" -- another MV2 nail in the coffin.
+
+  So Shield is built the future-proof way, folded into LMB's OWN extension
+  (the user chose "build it into LMB itself" over bundling uBO Lite):
+  - `tools/build-shield-rules.py` fetches EasyList + EasyPrivacy (GPLv3, the
+    same lists uBO uses, from easylist.to -- never Google) and compiles their
+    *network* filters into Chromium's native declarativeNetRequest static
+    rulesets. DNR's `urlFilter` grammar was deliberately modelled on Adblock
+    syntax (`||domain^`, `$third-party`, `$domain=`, `@@` exceptions), so the
+    translation is faithful. ~106k rules compiled (49,868 block + 548 allow
+    from EasyList; 54,974 + 833 from EasyPrivacy). Cosmetic `##` filters are
+    skipped -- they don't map to DNR (element-hiding is a possible follow-up).
+  - Rulesets declared `enabled:true` in `extension/manifest.json`
+    (`declarative_net_request.rule_resources`), so blocking is ON from first
+    launch with zero runtime cost -- the engine is native C++, not a JS add-on.
+  - Verified on the real Chromium 151 + the REAL LMB manifest (which uses
+    `declarativeNetRequestWithHostAccess`, not plain `declarativeNetRequest` --
+    tested that static block rulesets still enable under it): no manifest/
+    ruleset load errors; both rulesets enabled; and real ad/tracker requests
+    (googlesyndication, doubleclick, google-analytics, googletagmanager,
+    scorecardresearch) all matched block rules via getMatchedRules. All 106k
+    rules fit -- `getAvailableStaticRuleCount` reported 223,777 remaining, so
+    the static ceiling is ~330k with headroom to add uBO's own lists later.
+  - Sidebar Settings has an "LMB Shield" on/off toggle (`shieldToggle`).
+    `background.js` `setShield()` persists the choice and
+    `applyShieldState()` re-applies it on every startup via
+    `updateEnabledRulesets` (the manifest would otherwise re-enable). Verified
+    the full cycle incl. a simulated restart: off persists and survives,
+    on re-enables.
+  - Auto-update: rulesets recompile on every build (`build.sh` runs the
+    converter before bundling), so each LMB release ships fresh filters and
+    rides the existing self-updater. The generated JSON (~11MB) is gitignored;
+    a fresh clone must run the converter (build does this automatically). If
+    the lists are briefly unreachable at build time, build.sh falls back to
+    any rulesets already present rather than shipping an unblocked browser.
+
+- **v0.14: removed "Gemini in Chrome" component extension** (2026-08-18).
+  Chromium 151 ships Google Gemini as a built-in *component* extension
+  (id `admccjkmockfdflocgggjfgdacdodkdf`) with a background service worker.
+  It loads even with the `Glic`/`GlicIntegration`/`GeminiInChromeSidePanel`
+  feature flags off (verified: still present). `--disable-component-extensions-
+  with-background-pages` removes it. Checked it's surgical, not a blanket
+  break: the built-in PDF viewer (also a component extension) still renders a
+  test PDF with the switch on. Added to AppRun launch flags. Directly serves
+  the "Google must be completely stripped" requirement.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

@@ -127,6 +127,34 @@ document.getElementById("changeSearchEngineBtn").addEventListener("click", () =>
   chrome.tabs.create({ url: "chrome://settings/searchEngines" });
 });
 
+// ---- LMB Shield (ad / tracker blocking) ----
+// The blocking is done by Chromium's native declarativeNetRequest engine
+// (static rulesets declared in the manifest, on by default). Here we just
+// reflect and toggle the user's on/off choice; the background worker
+// actually enables/disables the rulesets so the decision survives restart.
+const shieldToggle = document.getElementById("shieldToggle");
+const shieldDot = document.getElementById("shieldDot");
+const shieldStatusText = document.getElementById("shieldStatusText");
+
+function renderShield(enabled) {
+  shieldToggle.checked = enabled;
+  shieldDot.className = "status-dot " + (enabled ? "ok" : "error");
+  shieldStatusText.textContent = enabled
+    ? "Blocking ads & trackers"
+    : "Off — ads & trackers allowed";
+}
+
+(async () => {
+  const { shieldEnabled = true } = await chrome.storage.local.get("shieldEnabled");
+  renderShield(shieldEnabled);
+})();
+
+shieldToggle.addEventListener("change", () => {
+  const enabled = shieldToggle.checked;
+  renderShield(enabled);
+  chrome.runtime.sendMessage({ type: "lightmorphic-shield-set", enabled });
+});
+
 // ---- Framing pinned sites ----
 // Most big sites (BBC, Google, etc.) send X-Frame-Options or a CSP
 // frame-ancestors directive that forbids being loaded in an iframe --

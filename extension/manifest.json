@@ -51,5 +51,19 @@
       "run_at": "document_start",
       "all_frames": true
     }
-  ]
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "easylist",
+        "enabled": true,
+        "path": "shield/rules/easylist.json"
+      },
+      {
+        "id": "easyprivacy",
+        "enabled": true,
+        "path": "shield/rules/easyprivacy.json"
+      }
+    ]
+  }
 }

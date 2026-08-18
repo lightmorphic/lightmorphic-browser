@@ -5,3 +5,12 @@ appimage/appimagetool
 appimage/chrome-linux.zip
 *.log
 .DS_Store
+
+# LMB Shield rulesets are compiled from upstream filter lists at build
+# time (tools/build-shield-rules.py) -- ~11MB of generated JSON, kept out
+# of git and regenerated fresh on every build.
+extension/shield/rules/*.json
+
+# Python bytecode
+__pycache__/
+*.pyc
