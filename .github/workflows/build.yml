@@ -45,7 +45,11 @@ jobs:
           # Asset filenames embed a build number that changes (e.g.
           # appimagetool-947-x86_64.AppImage), so resolve the real URL via
           # the API rather than hardcoding it.
-          URL=$(curl -s "https://api.github.com/repos/probonopd/go-appimage/releases/tags/continuous" \
+          # Authenticated: anonymous api.github.com calls from shared
+          # Actions runner IPs hit rate limits (seen live: .assets came
+          # back null and jq died).
+          URL=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/probonopd/go-appimage/releases/tags/continuous" \
             | jq -r '.assets[] | select(.name | test("^appimagetool-[0-9]+-x86_64\\.AppImage$")) | .browser_download_url')
           curl -sL -o appimage/appimagetool "$URL"
           chmod +x appimage/appimagetool
