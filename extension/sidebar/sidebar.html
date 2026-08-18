@@ -113,17 +113,14 @@
         </form>
       </section>
 
-      <!-- Dedicated update footer -- always visible regardless of which
-           section is active, and unlike the new-tab page it can't be
-           replaced out from under the update system. House widget:
-           coloured circle, name + version centred against it. -->
+      <!-- Dedicated update footer, pinned bottom-left. Version number
+           then the status circle -- always visible, and unlike the
+           new-tab page it can't be replaced out from under the update
+           system. -->
       <footer class="app-footer">
         <button class="update-widget" id="footerUpdateWidget" type="button">
+          <span class="update-version" id="footerUpdateVersion">v&hellip;</span>
           <span class="update-dot" id="footerUpdateDot"></span>
-          <span class="update-label">
-            <span class="update-name">LMB</span>
-            <span class="update-version" id="footerUpdateVersion">v&hellip;</span>
-          </span>
         </button>
       </footer>
     </div>

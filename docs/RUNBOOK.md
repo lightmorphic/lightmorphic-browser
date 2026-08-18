@@ -411,6 +411,28 @@
     through this session (display flakiness) but the CSS is standard and
     syntax-checked -- worth an eyeball on the next real run.
 
+- **v0.08: update footer reformatted, whole-browser light/dark, update
+  removed from new tab** (2026-08-18).
+  - Update footer: now bottom-left, just the version number then the
+    status circle (no "LMB" name), in its own footer bar. Verified live.
+  - Removed the update widget from the new-tab page entirely (a
+    replaceable page is the wrong home for it -- the sidebar footer is
+    the durable one).
+  - **Whole-browser light/dark** (previously the toggle only themed the
+    sidebar panel). The browser chrome colour comes from whichever theme
+    package the launcher loads, so added a light theme package
+    (`theme-light/`); AppRun reads a `theme-mode` file and loads light or
+    dark accordingly. The rail toggle flips the sidebar instantly (CSS)
+    AND messages the native host, which writes `theme-mode` and restarts
+    the browser (same relaunch path as the updater, already verified) so
+    the whole chrome switches. Verified live: launching with
+    `theme-mode=light` gives a fully light browser (light frame, white
+    toolbar, dark text) -- the mechanism works. Honest cost, stated to
+    the user: flipping light/dark restarts the browser to apply to the
+    chrome (tabs restored). Sidebar theme (chrome.storage) and browser
+    theme (theme-mode file) are set together by the toggle so they stay
+    in sync.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

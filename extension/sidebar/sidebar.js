@@ -118,29 +118,29 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // ---- Light / dark toggle ----
-// Cycles OS-default -> forced light -> forced dark -> back. The choice is
-// stored so it persists, and overrides the OS setting via data-theme
-// (see sidebar.css). Null/absent means "follow the OS".
+// Straight light <-> dark (default dark, matching the browser's default
+// theme). The sidebar changes instantly via data-theme (CSS); the whole
+// browser chrome (tabs/toolbar) is changed by asking the native host to
+// swap the loaded theme package and restart -- see background.js. So one
+// click flips the sidebar immediately and the rest of the browser after a
+// quick auto-restart (tabs restored).
 const railThemeToggle = document.getElementById("railThemeToggle");
 
-function applyTheme(theme) {
-  if (theme === "light" || theme === "dark") {
-    document.documentElement.setAttribute("data-theme", theme);
-  } else {
-    document.documentElement.removeAttribute("data-theme");
-  }
+function applyTheme(mode) {
+  document.documentElement.setAttribute("data-theme", mode === "light" ? "light" : "dark");
 }
 
 async function loadTheme() {
-  const { sidebarTheme } = await chrome.storage.local.get("sidebarTheme");
-  applyTheme(sidebarTheme);
+  const { themeMode } = await chrome.storage.local.get("themeMode");
+  applyTheme(themeMode || "dark");
 }
 
 railThemeToggle.addEventListener("click", async () => {
-  const { sidebarTheme } = await chrome.storage.local.get("sidebarTheme");
-  const next = sidebarTheme === "dark" ? "light" : sidebarTheme === "light" ? null : "dark";
-  await chrome.storage.local.set({ sidebarTheme: next });
-  applyTheme(next);
+  const { themeMode } = await chrome.storage.local.get("themeMode");
+  const next = (themeMode || "dark") === "dark" ? "light" : "dark";
+  await chrome.storage.local.set({ themeMode: next });
+  applyTheme(next); // sidebar updates immediately
+  chrome.runtime.sendMessage({ type: "lightmorphic-set-theme", mode: next }); // whole browser (restarts)
 });
 
 // ---- Search engine ----

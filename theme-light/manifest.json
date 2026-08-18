@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "LMB Theme (Light)",
+  "version": "0.1.0",
+  "description": "Light browser theme for LMB (Lightmorphic Browser).",
+  "theme": {
+    "colors": {
+      "frame": [228, 228, 231],
+      "frame_inactive": [228, 228, 231],
+      "toolbar": [255, 255, 255],
+      "tab_text": [17, 24, 39],
+      "tab_background_text": [113, 113, 122],
+      "bookmark_text": [17, 24, 39],
+      "toolbar_text": [17, 24, 39],
+      "ntp_background": [255, 255, 255],
+      "ntp_text": [17, 24, 39],
+      "ntp_link": [27, 116, 188],
+      "button_background": [251, 199, 17],
+      "omnibox_background": [244, 244, 245],
+      "omnibox_text": [17, 24, 39]
+    }
+  }
+}

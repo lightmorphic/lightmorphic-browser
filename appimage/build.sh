@@ -101,6 +101,8 @@ echo "==> Bundling theme"
 # path list works correctly for both.
 mkdir -p "$APPDIR/usr/share/lightmorphic-browser/theme"
 cp -r "$ROOT/theme/." "$APPDIR/usr/share/lightmorphic-browser/theme/"
+mkdir -p "$APPDIR/usr/share/lightmorphic-browser/theme-light"
+cp -r "$ROOT/theme-light/." "$APPDIR/usr/share/lightmorphic-browser/theme-light/"
 
 echo "==> Bundling self-updater native host"
 cp "$ROOT/appimage/lmb-updater" "$APPDIR/usr/share/lightmorphic-browser/lmb-updater"
@@ -111,10 +113,22 @@ cat > "$APPDIR/AppRun" <<'EOF'
 #!/usr/bin/env bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 EXT="$HERE/usr/share/lightmorphic-browser/extension"
-THEME="$HERE/usr/share/lightmorphic-browser/theme"
-LOAD_PATHS="$EXT,$THEME"
 USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
 PROFILE_DIR="$USER_DATA_DIR/Default"
+
+# Whole-browser light/dark: the chrome (tabs/toolbar) colour comes from
+# whichever theme package we load. The sidebar's light/dark toggle writes
+# a theme-mode file (via the native host) then restarts; here we load the
+# matching theme so the whole browser -- not just the sidebar panel --
+# switches. Default dark.
+THEME_MODE="dark"
+[ -f "$USER_DATA_DIR/theme-mode" ] && THEME_MODE=$(tr -d '[:space:]' < "$USER_DATA_DIR/theme-mode")
+if [ "$THEME_MODE" = "light" ]; then
+  THEME="$HERE/usr/share/lightmorphic-browser/theme-light"
+else
+  THEME="$HERE/usr/share/lightmorphic-browser/theme"
+fi
+LOAD_PATHS="$EXT,$THEME"
 
 # --- Self-updater plumbing (for the "click blue to install & restart"
 # flow). The extension talks to a native-messaging host that swaps the
