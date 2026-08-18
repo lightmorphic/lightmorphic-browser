@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>New tab</title>
+<link rel="stylesheet" href="newtab.css">
+</head>
+<body>
+  <main class="centre">
+    <img src="logo.png" alt="" width="72" height="72" class="logo">
+    <h1>Lightmorphic Browser</h1>
+    <form id="searchForm" class="search-row">
+      <input id="searchBox" type="search" placeholder="Search DuckDuckGo or type a URL" autofocus autocomplete="off">
+    </form>
+  </main>
+
+  <!-- House update-widget: circle twice the text height, name + version
+       vertically centred against it, out-of-the-way corner. Green = up to
+       date (click = manual re-check), yellow = update available (click =
+       download), ring = downloading, blue = downloaded (click for how to
+       apply), red = can't reach GitHub. -->
+  <button class="update-widget" id="updateWidget" type="button">
+    <span class="update-dot" id="updateDot"></span>
+    <span class="update-label">
+      <span class="update-name">Lightmorphic Browser</span>
+      <span class="update-version" id="updateVersion">v&hellip;</span>
+    </span>
+  </button>
+
+  <script type="module" src="newtab.js"></script>
+</body>
+</html>

@@ -51,6 +51,9 @@ jobs:
           chmod +x appimage/appimagetool
       - name: Build AppImage
         run: ./appimage/build.sh "${{ needs.check-version.outputs.version }}"
+      - name: Read browser version
+        id: browser_version
+        run: echo "value=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
       - name: Commit last-built version
         run: |
           git config user.name "github-actions"
@@ -77,5 +80,9 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.check-version.outputs.version }}
+          # Browser alpha version + underlying Chromium version, so
+          # automatic Chromium-update rebuilds get distinct tags without
+          # bumping the browser's own version.
+          tag_name: v${{ steps.browser_version.outputs.value }}-${{ needs.check-version.outputs.version }}
+          name: Lightmorphic Browser v${{ steps.browser_version.outputs.value }} (Chromium ${{ needs.check-version.outputs.version }})
           files: dist/*.AppImage

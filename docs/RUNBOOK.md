@@ -275,6 +275,42 @@
   source-level fork. **Not attempted further this round** — flagged to
   Charlie as a scope decision rather than silently worked around.
 
+- **Rebranding without a fork, alpha versioning, new-tab update widget,
+  sign-in removal, single-profile mode** (2026-08-18). The fork-level
+  branding ceiling turned out to have a large escape hatch: all
+  user-visible product strings ("Your Chromium", "Add Chromium profile",
+  window titles, settings/infobar text) live in `locales/*.pak` — a
+  simple documented archive format — NOT compiled into the binary.
+  `appimage/patch-pak.py` parses and rewrites them at package time
+  (Chromium→Lightmorphic Browser, plus targeted whole-phrase Google
+  replacements like "Google services settings"→"Account services
+  settings"; deliberately no blanket Google replace, which would
+  manufacture false statements). The Chromium binary stays byte-identical
+  to upstream, so automatic updates keep working. Verified live: profile
+  menu reads "Your Lightmorphic Browser / Manage Lightmorphic Browser
+  profiles", infobars rebranded, browser boots and runs normally on
+  repacked files (228 locales, ~50k strings patched).
+  - Browser now has its own alpha version (`VERSION` file, v0.01);
+    releases tag as `v<browser>-<chromium>` so auto Chromium-update
+    rebuilds don't collide. AppImage named
+    `Lightmorphic-Browser-0.01-x86_64.AppImage`.
+  - New-tab page override: Lightmorphic wordmark, DuckDuckGo search box,
+    and the house update-widget (name + version beside a coloured circle,
+    bottom-left; green/yellow/ring/blue/red states, click-to-act).
+    Verified live. Known quirk: the very first tab at startup shows the
+    stock NTP (extension loads a beat too late); every tab after that
+    gets the override.
+  - Sign-in surfaces disabled (`signin.allowed[_on_next_startup]:false`)
+    and single-profile mode: `profile.add_person_enabled` and
+    `browser_guest_enabled` false in a seeded Local State — verified
+    live that "Add profile" and "Open guest profile" are gone from the
+    profile menu. "Manage profiles" has no pref-level switch and remains.
+  - Debugging note for future test scripts: `pkill -f <pattern>` kills
+    the invoking shell itself when the pattern appears in the same
+    command line (e.g. in profile paths passed to rm) — this silently
+    ate several test runs before being spotted. Kill by pgrep pid or use
+    patterns that can't appear in your own command.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

@@ -20,6 +20,12 @@ CHROMIUM_VERSION="${1:?usage: build.sh <chromium-version>}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APPDIR="$ROOT/appimage/AppDir"
 DIST="$ROOT/dist"
+# The browser's own alpha version (0.01, 0.02, ...) -- what users see.
+# The Chromium version underneath is tracked separately; release tags
+# combine both (v0.01-151.0.7922.137) so automatic Chromium-update
+# rebuilds don't collide with each other under one browser version.
+BROWSER_VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
+RELEASE_TAG="v${BROWSER_VERSION}-${CHROMIUM_VERSION}"
 
 rm -rf "$APPDIR/usr"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/lightmorphic-browser/extension" "$DIST"
@@ -64,6 +70,18 @@ curl -sL "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Li
 unzip -q -o "$ROOT/appimage/chrome-linux.zip" -d "$APPDIR/usr/bin"
 mv "$APPDIR/usr/bin/chrome-linux" "$APPDIR/usr/bin/chromium"
 
+echo "==> Rebranding locale resources (Chromium -> Lightmorphic Browser)"
+# All user-visible product strings ("Your Chromium", "Add Chromium
+# profile", window titles, settings text) live in locales/*.pak -- a
+# simple documented archive format -- NOT compiled into the binary. This
+# rewrites them at package time, so the Chromium binary itself stays
+# byte-identical to upstream (updates keep flowing) while every visible
+# surface says Lightmorphic Browser. Verified empirically: the profile
+# menu that read "Your Chromium / Add Chromium profile / Manage Chromium
+# profiles" reads "Lightmorphic Browser" for all three after patching,
+# and the browser boots and runs normally on the repacked files.
+python3 "$ROOT/appimage/patch-pak.py" "$APPDIR/usr/bin/chromium/locales"
+
 echo "==> Bundling extension"
 cp -r "$ROOT/extension/." "$APPDIR/usr/share/lightmorphic-browser/extension/"
 # The extension's own manifest version (extension/manifest.json) tracks
@@ -72,7 +90,7 @@ cp -r "$ROOT/extension/." "$APPDIR/usr/share/lightmorphic-browser/extension/"
 # "update available" even when fully current. This file records what
 # release this AppImage actually was, for the update check to compare
 # against instead.
-echo "{\"releaseTag\": \"v${CHROMIUM_VERSION}\"}" > "$APPDIR/usr/share/lightmorphic-browser/extension/version.json"
+echo "{\"releaseTag\": \"${RELEASE_TAG}\", \"browserVersion\": \"${BROWSER_VERSION}\", \"chromiumVersion\": \"${CHROMIUM_VERSION}\"}" > "$APPDIR/usr/share/lightmorphic-browser/extension/version.json"
 
 echo "==> Bundling theme"
 # A separate package, not a "theme" key merged into the main extension's
@@ -124,8 +142,23 @@ PROFILE_DIR="$USER_DATA_DIR/Default"
 #    search_provider is Windows/Mac only per Chrome's own docs), so this
 #    is the only reliable mechanism -- and it only applies pre-first-run,
 #    which is exactly when this file is written.
+# 4. signin.allowed / allowed_on_next_startup false -- removes the
+#    sign-in-to-Google surfaces. Single-profile mode comes from Local
+#    State (a separate file at the user-data-dir root):
+#    profile.add_person_enabled=false removes "Add profile",
+#    profile.browser_guest_enabled=false removes "Open guest profile" --
+#    both verified gone from the profile menu in a live test. "Manage
+#    profiles" has no pref-level switch and remains (documented gap).
 if [ ! -f "$PROFILE_DIR/Preferences" ]; then
   mkdir -p "$PROFILE_DIR"
+  cat > "$USER_DATA_DIR/Local State" <<'LOCALSTATE'
+{
+  "profile": {
+    "add_person_enabled": false,
+    "browser_guest_enabled": false
+  }
+}
+LOCALSTATE
   cat > "$PROFILE_DIR/Preferences" <<'PREFS'
 {
   "pinned_extensions": ["hokpgjhmbdcggofdeaaobeknogcmlbfa"],
@@ -133,6 +166,10 @@ if [ ! -f "$PROFILE_DIR/Preferences" ]; then
     "ui": {
       "developer_mode": true
     }
+  },
+  "signin": {
+    "allowed": false,
+    "allowed_on_next_startup": false
   },
   "default_search_provider_data": {
     "template_url_data": {
@@ -225,10 +262,10 @@ echo "==> Packaging AppImage"
 # output-path second argument (that silently no-ops with "Please specify
 # the path to the AppDir"). It auto-names the output from $VERSION and the
 # .desktop file's Name field, so run it from $DIST and rename afterward.
-FINAL_NAME="Lightmorphic-Browser-${CHROMIUM_VERSION}-x86_64.AppImage"
+FINAL_NAME="Lightmorphic-Browser-${BROWSER_VERSION}-x86_64.AppImage"
 BUILD_MARKER=$(mktemp)
-(cd "$DIST" && ARCH=x86_64 VERSION="$CHROMIUM_VERSION" "$ROOT/appimage/appimagetool" "$APPDIR")
-GENERATED=$(find "$DIST" -maxdepth 1 -name "*-${CHROMIUM_VERSION}-x86_64.AppImage" -newer "$BUILD_MARKER" | head -1)
+(cd "$DIST" && ARCH=x86_64 VERSION="$BROWSER_VERSION" "$ROOT/appimage/appimagetool" "$APPDIR")
+GENERATED=$(find "$DIST" -maxdepth 1 -name "*-${BROWSER_VERSION}-x86_64.AppImage" -newer "$BUILD_MARKER" | head -1)
 rm -f "$BUILD_MARKER"
 if [ -z "$GENERATED" ]; then
   echo "==> appimagetool did not produce an AppImage in $DIST" >&2
@@ -238,4 +275,4 @@ mv "$GENERATED" "$DIST/$FINAL_NAME"
 chmod +x "$DIST/$FINAL_NAME"
 
 echo "$CHROMIUM_VERSION" > "$ROOT/appimage/last-built-version.txt"
-echo "==> Done: dist/$FINAL_NAME"
+echo "==> Done: dist/$FINAL_NAME (release tag ${RELEASE_TAG})"

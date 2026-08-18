@@ -194,6 +194,7 @@ chrome.downloads.onChanged.addListener(async (delta) => {
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "lightmorphic-download-update") downloadUpdate();
+  if (message?.type === "lightmorphic-check-update") checkForUpdate();
   return false;
 });
 

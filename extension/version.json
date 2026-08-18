@@ -1,3 +1,5 @@
 {
-  "releaseTag": "dev"
+  "releaseTag": "dev",
+  "browserVersion": "dev",
+  "chromiumVersion": "dev"
 }
