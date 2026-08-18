@@ -118,12 +118,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // ---- Light / dark toggle ----
-// Straight light <-> dark (default dark, matching the browser's default
-// theme). The sidebar changes instantly via data-theme (CSS); the whole
-// browser chrome (tabs/toolbar) is changed by asking the native host to
-// swap the loaded theme package and restart -- see background.js. So one
-// click flips the sidebar immediately and the rest of the browser after a
-// quick auto-restart (tabs restored).
+// Straight light <-> dark (default dark). The sidebar recolours instantly
+// via data-theme (CSS). The preference is also persisted for the launcher
+// (via the native host writing a theme-mode file) so the whole browser
+// chrome -- tabs/toolbar -- switches on the NEXT launch. It deliberately
+// does NOT force a restart: doing that on a colour toggle was fragile and
+// left the browser broken.
 const railThemeToggle = document.getElementById("railThemeToggle");
 
 function applyTheme(mode) {
@@ -140,7 +140,7 @@ railThemeToggle.addEventListener("click", async () => {
   const next = (themeMode || "dark") === "dark" ? "light" : "dark";
   await chrome.storage.local.set({ themeMode: next });
   applyTheme(next); // sidebar updates immediately
-  chrome.runtime.sendMessage({ type: "lightmorphic-set-theme", mode: next }); // whole browser (restarts)
+  chrome.runtime.sendMessage({ type: "lightmorphic-set-theme", mode: next }); // persists for next launch
 });
 
 // ---- Search engine ----

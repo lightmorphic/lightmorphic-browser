@@ -433,6 +433,43 @@
     theme (theme-mode file) are set together by the toggle so they stay
     in sync.
 
+- **v0.09: fix v0.08 "totally broken" regression** (2026-08-18). v0.08's
+  light/dark toggle force-restarted the whole browser (to re-theme the
+  chrome), and the relaunched browser came up black/broken -- reproduced
+  live: clicking the toggle killed the browser and it never re-rendered.
+  That was the "complete mess". Two fixes:
+  1. The theme toggle no longer restarts. It recolours the sidebar
+     instantly (CSS) and persists the mode (native host writes the
+     `theme-mode` file, no restart); the browser chrome picks it up on the
+     next normal launch. Verified live: clicking the toggle now leaves the
+     browser up and working, sidebar switches to light immediately.
+  2. Hardened the restart path (still used by the self-updater's install):
+     it now SIGTERMs only OUR browser (matched by exact `--user-data-dir`,
+     not a broad `chromium/chrome` match that could have hit Brave / other
+     Chromium apps), and the relauncher clears the stale single-instance
+     lock (`Singleton*`) before starting, which was the likely cause of
+     the black relaunch.
+  Lesson logged: don't force a full browser restart for a cosmetic change;
+  and a fresh-profile smoke test isn't enough -- the regression only
+  showed when actually exercising the new control.
+  - Also fixed the "search page gone" report: the new-tab override only
+    applies to tabs opened AFTER the unpacked extension registers, so the
+    very first startup tab showed the stock Chromium NTP. background.js
+    now redirects any stock-NTP tab to the LMB page from an AWAITED loop
+    in onInstalled/onStartup (keeps the MV3 worker alive across retries;
+    a bare setTimeout got killed when the worker suspended), plus a
+    tabs.onUpdated catch. Verified the LMB search page shows on startup.
+  - Dark is the default (fresh profile -> dark chrome + dark sidebar). A
+    user who lands in light did so via the toggle; toggling back to dark
+    now works without crashing.
+  - Pinning the toolbar icon by default: still not reliable from the
+    `pinned_extensions` seed (the unpacked extension registers after the
+    toolbar model initialises). The extension is always ACTIVE (loaded
+    every launch); the icon just may need a one-time manual pin
+    (puzzle-piece menu -> pin), which then sticks. True force-pin needs
+    enterprise policy (root) or a source fork -- out of scope, as noted
+    earlier.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

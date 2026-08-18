@@ -267,16 +267,57 @@ async function runSyncPass() {
   await rebuildQuickPasteMenu();
 }
 
+// The new-tab override (chrome_url_overrides) only applies to tabs opened
+// AFTER the unpacked extension has registered -- so the very first tab at
+// startup shows the stock Chromium NTP instead of the LMB search page.
+// Once the worker is up we redirect any stock-NTP tab to our page. The
+// loop is AWAITED by the event listener so the MV3 service worker stays
+// alive across the retries (a bare setTimeout gets killed when the worker
+// suspends after the event handler returns -- that's why the first
+// attempt at this didn't work).
+async function redirectStockNtp() {
+  const our = chrome.runtime.getURL("newtab/newtab.html");
+  for (let i = 0; i < 12; i++) {
+    const tabs = await chrome.tabs.query({});
+    let redirected = false;
+    for (const t of tabs) {
+      const u = t.url || t.pendingUrl || "";
+      if (u === "chrome://newtab/" || u.startsWith("chrome://new-tab-page")) {
+        try {
+          await chrome.tabs.update(t.id, { url: our });
+          redirected = true;
+        } catch {
+          /* tab gone */
+        }
+      }
+    }
+    if (redirected) return;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
+// Belt-and-suspenders: also catch a stock NTP that commits late.
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  const u = info.url || "";
+  if (u === "chrome://newtab/" || u.startsWith("chrome://new-tab-page")) {
+    chrome.tabs.update(tabId, { url: chrome.runtime.getURL("newtab/newtab.html") }).catch(() => {});
+  }
+});
+
 chrome.runtime.onInstalled.addListener(async () => {
   await rebuildQuickPasteMenu();
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
   checkForUpdate();
+  await redirectStockNtp();
 });
 
 // onInstalled only fires on first load / version bump, not every browser
 // launch -- onStartup covers the normal "opened the browser today" case.
-chrome.runtime.onStartup.addListener(() => checkForUpdate());
+chrome.runtime.onStartup.addListener(async () => {
+  checkForUpdate();
+  await redirectStockNtp();
+});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SYNC_ALARM) runSyncPass();

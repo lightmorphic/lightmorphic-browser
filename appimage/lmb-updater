@@ -46,21 +46,31 @@ printf '%s' "$reply"
 
 restart_browser() {
   [ -z "$target" ] && { echo "no target to relaunch" >&2; return; }
-  # detached relauncher: wait for this browser to exit, then start it
-  setsid bash -c '
-    t="'"$target"'"
-    for _ in $(seq 1 120); do
-      pgrep -f "$t" >/dev/null 2>&1 || break
-      sleep 0.5
-    done
-    exec "$t"
-  ' </dev/null >/dev/null 2>&1 &
-  # ask the browser to quit (the no --type= chrome process = browser)
-  for pid in $(pgrep -f "chromium/chrome" 2>/dev/null || true); do
+  # Only SIGTERM OUR browser: match the exact user-data-dir, and skip
+  # child processes (--type=). This must NOT touch other Chromium-based
+  # apps (Brave, Electron, system chromium) the user has open.
+  local our_pids="" pid
+  for pid in $(pgrep -f -- "--user-data-dir=${USER_DATA_DIR}" 2>/dev/null || true); do
     if [ -r "/proc/$pid/cmdline" ] && ! tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q -- '--type='; then
-      kill -TERM "$pid" 2>/dev/null || true
+      our_pids="$our_pids $pid"
     fi
   done
+  echo "our browser pids:$our_pids" >&2
+  # detached relauncher: wait for our browser to fully exit, clear the
+  # stale single-instance lock (an abruptly-ended session can leave it,
+  # which makes the next launch forward to a dead process and show a
+  # black/empty window), then start fresh.
+  setsid bash -c '
+    t="'"$target"'"; udd="'"$USER_DATA_DIR"'"
+    for _ in $(seq 1 120); do
+      pgrep -f -- "--user-data-dir=$udd" >/dev/null 2>&1 || break
+      sleep 0.5
+    done
+    sleep 1
+    rm -f "$udd/SingletonLock" "$udd/SingletonSocket" "$udd/SingletonCookie" 2>/dev/null || true
+    exec "$t"
+  ' </dev/null >/dev/null 2>&1 &
+  for pid in $our_pids; do kill -TERM "$pid" 2>/dev/null || true; done
 }
 
 case "$action" in
@@ -76,11 +86,14 @@ case "$action" in
     restart_browser
     ;;
   set-theme)
+    # Persist the preference ONLY -- do NOT restart. Forcing a whole
+    # browser restart on a colour toggle was fragile and left the
+    # relaunched browser broken. The sidebar recolours instantly (CSS);
+    # the browser chrome picks up this file on the next normal launch.
     mode=$(field mode)
     [ "$mode" = "light" ] || mode="dark"
     printf '%s' "$mode" > "${USER_DATA_DIR}/theme-mode"
-    echo "theme-mode set to $mode" >&2
-    restart_browser
+    echo "theme-mode set to $mode (no restart)" >&2
     ;;
   *)
     echo "unknown action" >&2
