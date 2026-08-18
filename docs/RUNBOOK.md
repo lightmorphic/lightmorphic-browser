@@ -497,6 +497,20 @@
   visible -- confirmed the menu renders on-screen after the fix. The
   Panels section is now just the display iframe plus an empty-state hint.
 
+- **v0.13: back/forward/reload for pinned-site panels** (2026-08-18).
+  Pinned sites load in a cross-origin iframe, and an extension CANNOT
+  touch a cross-origin frame's history from outside (`contentWindow.history`
+  throws) -- so naive back/forward buttons would silently do nothing.
+  Solved it the right way: the content script (now `all_frames: true`, so
+  it runs INSIDE the pinned page, same-origin to it) listens for a
+  postMessage from the sidebar and runs `history.back()/forward()/
+  location.reload()` there. The nav bar (back / forward / reload + host
+  label) shows above an open pinned site. Verified end-to-end on a real
+  display: navigated Cat -> Talk:Cat inside the panel, Back returned to
+  Cat, Forward returned to Talk:Cat. Reload uses the same path so it
+  keeps the in-frame position instead of jumping to the pinned URL.
+  Origin-checked (only messages from our extension origin are honoured).
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

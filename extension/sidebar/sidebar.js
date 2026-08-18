@@ -215,8 +215,29 @@ notepad.addEventListener("input", () => {
 // iframing (BBC etc.) still load.
 const webPanelFrame = document.getElementById("webPanelFrame");
 const panelsEmpty = document.getElementById("panelsEmpty");
+const panelNav = document.getElementById("panelNav");
+const panelNavHost = document.getElementById("panelNavHost");
 const railSites = document.getElementById("railSites");
 const railAddSite = document.getElementById("railAddSite");
+
+let currentPanelUrl = null;
+
+// Back / forward / reload for the open pinned site. The sidebar can't
+// touch a cross-origin iframe's history from outside (same-origin policy),
+// so it postMessages the command to the frame, where our content script
+// -- same-origin to the page -- runs it (see clipboard-watch.js). This
+// gives real back/forward AND a reload that keeps the user's in-frame
+// position (rather than jumping back to the pinned URL).
+function navFrame(cmd) {
+  try {
+    webPanelFrame.contentWindow.postMessage({ __lmbNav: cmd }, "*");
+  } catch {
+    /* frame not ready */
+  }
+}
+document.getElementById("panelBack").addEventListener("click", () => navFrame("back"));
+document.getElementById("panelForward").addEventListener("click", () => navFrame("forward"));
+document.getElementById("panelReload").addEventListener("click", () => navFrame("reload"));
 const siteDialog = document.getElementById("siteDialog");
 const siteForm = document.getElementById("siteForm");
 const siteUrlInput = document.getElementById("siteUrl");
@@ -276,7 +297,10 @@ function openPanelSite(url) {
   document.querySelectorAll(".panel-view").forEach((p) => {
     p.classList.toggle("active", p.id === "panel-panels");
   });
-  if (panelsEmpty) panelsEmpty.hidden = true;
+  currentPanelUrl = url;
+  panelsEmpty.hidden = true;
+  panelNav.hidden = false;
+  try { panelNavHost.textContent = new URL(url).hostname; } catch { panelNavHost.textContent = ""; }
   loadInFrame(webPanelFrame, url);
 }
 

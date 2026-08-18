@@ -473,6 +473,39 @@ body {
   margin: 0;
 }
 
+/* Back / forward / reload bar shown above an open pinned site. */
+.panel-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+.panel-nav button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--fg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.panel-nav button svg { width: 17px; height: 17px; }
+.panel-nav button:hover { background: var(--muted); }
+.panel-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel-nav-host {
+  margin-left: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Add/edit-site dialog */
 dialog#siteDialog {
   border: 1px solid var(--panel-border);

@@ -48,7 +48,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["contextmenu/clipboard-watch.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ]
 }
