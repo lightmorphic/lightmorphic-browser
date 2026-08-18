@@ -104,6 +104,32 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.updateStatus) renderUpdateStatus(changes.updateStatus.newValue);
 });
 
+// ---- Light / dark toggle ----
+// Cycles OS-default -> forced light -> forced dark -> back. The choice is
+// stored so it persists, and overrides the OS setting via data-theme
+// (see sidebar.css). Null/absent means "follow the OS".
+const railThemeToggle = document.getElementById("railThemeToggle");
+
+function applyTheme(theme) {
+  if (theme === "light" || theme === "dark") {
+    document.documentElement.setAttribute("data-theme", theme);
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+
+async function loadTheme() {
+  const { sidebarTheme } = await chrome.storage.local.get("sidebarTheme");
+  applyTheme(sidebarTheme);
+}
+
+railThemeToggle.addEventListener("click", async () => {
+  const { sidebarTheme } = await chrome.storage.local.get("sidebarTheme");
+  const next = sidebarTheme === "dark" ? "light" : sidebarTheme === "light" ? null : "dark";
+  await chrome.storage.local.set({ sidebarTheme: next });
+  applyTheme(next);
+});
+
 // ---- Search engine ----
 document.getElementById("changeSearchEngineBtn").addEventListener("click", () => {
   chrome.tabs.create({ url: "chrome://settings/searchEngines" });
@@ -432,6 +458,7 @@ loadBookmarks();
 loadSnippets();
 loadStatus();
 loadUpdateStatus();
+loadTheme();
 
 chrome.bookmarks.onCreated.addListener(loadBookmarks);
 chrome.bookmarks.onRemoved.addListener(loadBookmarks);

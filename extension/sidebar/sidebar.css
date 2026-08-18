@@ -8,12 +8,21 @@
   --rail-width: 44px;
 }
 
+/* Dark values. Applied when the OS prefers dark AND the user hasn't
+   forced light, OR when the user explicitly picks dark via the rail
+   toggle -- so a manual choice always wins over the OS setting. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #09090b; --fg: #fafafa;
     --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
     --border: #27272a; --muted: #1c1c1f; --muted-fg: #a1a1aa;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #09090b; --fg: #fafafa;
+  --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
+  --border: #27272a; --muted: #1c1c1f; --muted-fg: #a1a1aa;
 }
 
 * { box-sizing: border-box; }
