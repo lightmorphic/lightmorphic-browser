@@ -39,18 +39,7 @@
       </section>
 
       <section id="panel-panels" class="panel-view">
-        <div class="panel-list" id="webPanelList"></div>
-        <button id="pinCurrentPageBtn" class="add-current-btn" type="button" title="Pin the page you're on now">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4.5v11M4.5 10h11"/></svg>
-          <span id="pinCurrentPageLabel">Pin this page</span>
-        </button>
-        <details class="add-manual">
-          <summary>Or pin a specific URL</summary>
-          <form id="addPanelForm" class="add-row">
-            <input id="addPanelUrl" type="url" placeholder="https://..." required>
-            <button type="submit" class="btn-primary">Pin</button>
-          </form>
-        </details>
+        <p class="empty-state" id="panelsEmpty">Pinned sites open here. Add one with the &plus; on the rail &mdash; the site you're on is pre-filled and you can edit it before saving. Click a pinned icon to open it; right-click to edit or remove.</p>
         <iframe id="webPanelFrame" class="web-frame" hidden></iframe>
       </section>
 
@@ -121,6 +110,27 @@
         </button>
       </footer>
     </div>
+  </div>
+
+  <!-- Add / edit a pinned site. The URL is pre-filled (current tab when
+       adding) and editable before saving. -->
+  <dialog id="siteDialog">
+    <form id="siteForm" method="dialog">
+      <h2 id="siteDialogTitle">Pin this page</h2>
+      <label>Address
+        <input id="siteUrl" type="url" placeholder="https://..." required autocomplete="off">
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="siteCancel" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Right-click menu for a pinned rail icon. -->
+  <div id="siteMenu" class="ctx-menu" hidden>
+    <button type="button" data-act="edit">Edit URL</button>
+    <button type="button" data-act="delete">Remove</button>
   </div>
 
   <script type="module" src="sidebar.js"></script>

@@ -206,28 +206,66 @@ notepad.addEventListener("input", () => {
   }, 600);
 });
 
-// ---- Web panels ----
-const webPanelList = document.getElementById("webPanelList");
+// ---- Web panels (pinned sites) ----
+// Pinned sites live as favicon buttons in the rail (Vivaldi-style). The
+// "+" grabs the current tab's URL, opens a dialog to edit it before
+// saving, and the saved site appears as a rail icon. Click an icon to
+// open the site in the panel; right-click it to edit or remove. Framing
+// headers are stripped per-host in loadInFrame so sites that block
+// iframing (BBC etc.) still load.
 const webPanelFrame = document.getElementById("webPanelFrame");
-const addPanelForm = document.getElementById("addPanelForm");
-const addPanelUrl = document.getElementById("addPanelUrl");
-const pinCurrentPageBtn = document.getElementById("pinCurrentPageBtn");
-const pinCurrentPageLabel = document.getElementById("pinCurrentPageLabel");
-
-async function pinUrl(url) {
-  const { webPanels = [] } = await chrome.storage.local.get("webPanels");
-  if (!webPanels.includes(url)) {
-    await chrome.storage.local.set({ webPanels: [...webPanels, url] });
-  }
-  loadWebPanels();
-}
-
-// Pinned sites also render as favicon buttons in the rail itself
-// (Vivaldi-style), below the section icons with a "+" underneath.
-// Favicons come from DuckDuckGo's icon service, consistent with the
-// no-Google stance; a broken icon falls back to a plain dot glyph.
+const panelsEmpty = document.getElementById("panelsEmpty");
 const railSites = document.getElementById("railSites");
 const railAddSite = document.getElementById("railAddSite");
+const siteDialog = document.getElementById("siteDialog");
+const siteForm = document.getElementById("siteForm");
+const siteUrlInput = document.getElementById("siteUrl");
+const siteCancel = document.getElementById("siteCancel");
+const siteDialogTitle = document.getElementById("siteDialogTitle");
+const siteMenu = document.getElementById("siteMenu");
+
+let dialogEditingUrl = null; // null = adding; a string = editing that URL
+let menuTargetUrl = null;
+
+function normaliseUrl(raw) {
+  const u = (raw || "").trim();
+  if (!u) return null;
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`;
+}
+
+async function getWebPanels() {
+  const { webPanels = [] } = await chrome.storage.local.get("webPanels");
+  return webPanels;
+}
+async function setWebPanels(list) {
+  await chrome.storage.local.set({ webPanels: list });
+  renderRailSites(list);
+}
+
+function openSiteDialog({ url = "", editing = null } = {}) {
+  dialogEditingUrl = editing;
+  siteDialogTitle.textContent = editing ? "Edit pinned site" : "Pin this page";
+  siteUrlInput.value = url;
+  siteDialog.showModal();
+  siteUrlInput.focus();
+  siteUrlInput.select();
+}
+
+siteCancel.addEventListener("click", () => siteDialog.close());
+
+siteForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const url = normaliseUrl(siteUrlInput.value);
+  if (!url) return;
+  const list = await getWebPanels();
+  if (dialogEditingUrl) {
+    await setWebPanels(list.map((u) => (u === dialogEditingUrl ? url : u)));
+  } else if (!list.includes(url)) {
+    await setWebPanels([...list, url]);
+  }
+  siteDialog.close();
+  openPanelSite(url);
+});
 
 function openPanelSite(url) {
   document.querySelectorAll(".rail-btn[data-panel]").forEach((b) => {
@@ -238,8 +276,47 @@ function openPanelSite(url) {
   document.querySelectorAll(".panel-view").forEach((p) => {
     p.classList.toggle("active", p.id === "panel-panels");
   });
+  if (panelsEmpty) panelsEmpty.hidden = true;
   loadInFrame(webPanelFrame, url);
 }
+
+function showSiteMenu(x, y, url) {
+  menuTargetUrl = url;
+  // Show first so we can measure it, then position. The rail is on the
+  // right edge, so open the menu to the LEFT of the cursor (into the
+  // panel) and clamp to the viewport so it's never off-screen.
+  siteMenu.hidden = false;
+  const pad = 8;
+  const w = siteMenu.offsetWidth;
+  const h = siteMenu.offsetHeight;
+  let left = x - w;
+  if (left < pad) left = pad;
+  if (left + w > window.innerWidth - pad) left = window.innerWidth - w - pad;
+  let top = y;
+  if (top + h > window.innerHeight - pad) top = window.innerHeight - h - pad;
+  if (top < pad) top = pad;
+  siteMenu.style.left = `${left}px`;
+  siteMenu.style.top = `${top}px`;
+}
+function hideSiteMenu() {
+  siteMenu.hidden = true;
+  menuTargetUrl = null;
+}
+
+siteMenu.addEventListener("click", async (e) => {
+  const act = e.target.dataset.act;
+  const url = menuTargetUrl;
+  hideSiteMenu();
+  if (!url || !act) return;
+  if (act === "edit") {
+    openSiteDialog({ url, editing: url });
+  } else if (act === "delete") {
+    const list = await getWebPanels();
+    await setWebPanels(list.filter((u) => u !== url));
+  }
+});
+document.addEventListener("click", hideSiteMenu);
+window.addEventListener("blur", hideSiteMenu);
 
 function renderRailSites(webPanels) {
   railSites.innerHTML = "";
@@ -263,63 +340,22 @@ function renderRailSites(webPanels) {
     });
     btn.appendChild(img);
     btn.addEventListener("click", () => openPanelSite(url));
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      showSiteMenu(e.clientX, e.clientY, url);
+    });
     railSites.appendChild(btn);
   }
 }
 
 async function loadWebPanels() {
-  const { webPanels = [] } = await chrome.storage.local.get("webPanels");
-  renderRailSites(webPanels);
-  webPanelList.innerHTML = "";
-  for (const url of webPanels) {
-    const item = document.createElement("div");
-    item.className = "panel-item";
-
-    const label = document.createElement("span");
-    label.textContent = url;
-    label.addEventListener("click", () => loadInFrame(webPanelFrame, url));
-
-    const remove = document.createElement("button");
-    remove.textContent = "×";
-    remove.title = "Unpin";
-    remove.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const { webPanels: current = [] } = await chrome.storage.local.get("webPanels");
-      await chrome.storage.local.set({ webPanels: current.filter((u) => u !== url) });
-      loadWebPanels();
-    });
-
-    item.append(label, remove);
-    webPanelList.appendChild(item);
-  }
+  renderRailSites(await getWebPanels());
 }
 
 railAddSite.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url || !/^https?:\/\//.test(tab.url)) return;
-  await pinUrl(tab.url);
-  openPanelSite(tab.url);
-});
-
-addPanelForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const url = addPanelUrl.value.trim();
-  if (!url) return;
-  await pinUrl(url);
-  addPanelUrl.value = "";
-});
-
-// Vivaldi-style quick add: grab whatever the user is actually looking at
-// right now instead of making them copy/paste the URL.
-pinCurrentPageBtn.addEventListener("click", async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url || !/^https?:\/\//.test(tab.url)) {
-    pinCurrentPageLabel.textContent = "Can't pin this page";
-    setTimeout(() => { pinCurrentPageLabel.textContent = "Pin this page"; }, 1500);
-    return;
-  }
-  await pinUrl(tab.url);
-  loadInFrame(webPanelFrame, tab.url);
+  const prefill = tab?.url && /^https?:\/\//.test(tab.url) ? tab.url : "";
+  openSiteDialog({ url: prefill });
 });
 
 // ---- Bookmarks ----

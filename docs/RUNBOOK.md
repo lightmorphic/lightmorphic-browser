@@ -485,6 +485,18 @@
   consistent with no toggle. This closes the light/dark thread -- it is
   not a "not yet built" item, it's confirmed not achievable in a wrapper.
 
+- **v0.12: pinned-site add/edit flow reworked** (2026-08-18). Per
+  feedback the in-panel "Pin this page" / manual-URL controls were
+  redundant. Now: the rail "+" grabs the current tab's URL and opens a
+  dialog to edit it before saving (verified: dialog pre-fills
+  `https://example.com/`, editable, Save). Saving adds it as a favicon in
+  the rail and opens it in the panel (verified). Right-clicking a rail
+  favicon shows a small Edit-URL / Remove menu. Fixed the reported
+  off-screen popup: the menu now opens LEFTWARD from the cursor (the rail
+  is on the right edge) and clamps to the panel viewport so it's always
+  visible -- confirmed the menu renders on-screen after the fix. The
+  Panels section is now just the display iframe plus an empty-state hint.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
