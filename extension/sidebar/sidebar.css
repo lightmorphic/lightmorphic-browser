@@ -28,6 +28,10 @@ body {
 
 .shell {
   display: flex;
+  /* Rail sits on the RIGHT edge of the panel (the outermost edge of the
+     window, since Chromium docks the side panel on the right) -- content
+     first, rail second. */
+  flex-direction: row-reverse;
   height: 100%;
 }
 
@@ -44,7 +48,7 @@ body {
   align-items: center;
   padding: 0.5rem 0;
   gap: 0.25rem;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   background: var(--muted);
 }
 
