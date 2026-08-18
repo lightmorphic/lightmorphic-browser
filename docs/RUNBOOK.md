@@ -311,6 +311,21 @@
     ate several test runs before being spotted. Kill by pgrep pid or use
     patterns that can't appear in your own command.
 
+- **v0.02: rail pinned-site icons + "+", LMB naming, rail on the right**
+  (2026-08-18). Pinned sites now render as favicon buttons in the icon
+  rail itself (Vivaldi-style) with a "+" button underneath that pins the
+  current page — verified live (pinned example.com via the +, icon
+  appeared with dot-fallback for its missing favicon, site opened
+  in-panel). Favicons via DuckDuckGo's icon service, consistent with the
+  no-Google stance. Naming: short form "LMB" on every user-visible
+  surface (pak rebrand, toolbar, panel header, new tab, update widget);
+  long form "LMB (Lightmorphic Browser)" only on explanatory surfaces
+  (launcher entry, AppStream, extension description). Rail moved to the
+  right edge of the panel (the outermost window edge, since Chromium
+  docks the side panel right). "Always visible" remains bounded by the
+  verified gesture restriction: the panel persists across tab switches
+  once opened, but nothing extension-side can force it open at launch.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
