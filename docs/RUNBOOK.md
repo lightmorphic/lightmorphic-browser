@@ -350,6 +350,43 @@
   - Cleanup: `appimage/AppDir/` was partially tracked in git from an
     early commit; now fully gitignored and untracked.
 
+- **v0.04 logo redesign + v0.05 Linux icon fix** (2026-08-18). Logo
+  rebuilt as a full navy rounded-square with the yellow motif centred and
+  the white edge removed (transparent rounded corners, verified alpha=0).
+  Then Charlie reported the Linux menu/taskbar icon still showed
+  Chromium. Diagnosed empirically on the nested display, two distinct
+  causes:
+  - The running window's `_NET_WM_ICON` is a **128px icon compiled into
+    resources.pak**, NOT the on-disk `product_logo_48.png` (confirmed by
+    swapping product_logo for red and reading the live property — window
+    icon was unaffected). So DEs that read `_NET_WM_ICON` directly can't
+    be fixed without a pak-image patch (not done).
+  - But Cinnamon/GNOME/KDE resolve the taskbar/menu icon by matching the
+    window's `WM_CLASS` to a `.desktop` file's `Icon=`. Chromium's
+    default WM_CLASS is `chrome`/`Chrome`, so they matched the system
+    Chromium. Fixed with `--class=lightmorphic-browser` (verified the
+    WM_CLASS second field is now `lightmorphic-browser`, matching our
+    `StartupWMClass`) plus installing the icon into the hicolor theme
+    (`usr/share/icons/hicolor/*/apps/lightmorphic-browser.png`) so
+    `Icon=lightmorphic-browser` actually resolves — it wasn't themed
+    before, which is why menus fell back. The `.DirIcon` was already our
+    logo. Honest edge: bare WMs that ignore `.desktop` mapping still see
+    the compiled Chromium `_NET_WM_ICON`; mainstream DEs (incl. Charlie's
+    Cinnamon/LMDE) now show ours.
+- **Un-removable / un-pinnable extension: confirmed not achievable in the
+  wrapper.** Making the extension force-installed (no Remove button) and
+  force-pinned (unpinnable) requires a Chromium **enterprise managed
+  policy** (`ExtensionSettings` `installation_mode: force_installed` +
+  `toolbar_pin: force_pinned`). On Linux that policy must live in
+  `/etc/.../policies/managed/`, which needs **root at install time** — an
+  AppImage runs as the user and can't write there — and force_installed
+  targets webstore/update_url extensions, not `--load-extension` unpacked
+  ones anyway. Truly enforcing it needs the source-fork/component-extension
+  route already ruled out. Per Charlie's own steer ("if not, we'll use
+  that as a selling point that it can be totally removed"), removability
+  is kept and framed as a privacy virtue — the opposite of Chrome's
+  un-removable Google integration.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

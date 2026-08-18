@@ -229,7 +229,13 @@ fi
 #                                      skips the upstream search-engine
 #                                      prompt (cosmetic, not itself a privacy
 #                                      fix)
+# --class sets the window's WM_CLASS. Without it Chromium reports
+# "chrome"/"Chrome", so desktop environments (Cinnamon/GNOME) match the
+# window to the system Chromium's .desktop and show the Chromium icon in
+# the taskbar/dock. Setting it to our own class makes them match our
+# .desktop (StartupWMClass=lightmorphic-browser) and show our icon.
 exec "$HERE/usr/bin/chromium/chrome" \
+  --class=lightmorphic-browser \
   --load-extension="$LOAD_PATHS" \
   --disable-extensions-except="$LOAD_PATHS" \
   --user-data-dir="$USER_DATA_DIR" \
@@ -249,6 +255,22 @@ chmod +x "$APPDIR/AppRun"
 cp "$ROOT/assets/icon-256.png" "$APPDIR/lightmorphic-browser.png"
 cp "$ROOT/appimage/co.lightmorphic.browser.desktop" "$APPDIR/lightmorphic-browser.desktop"
 mkdir -p "$APPDIR/usr/share/metainfo" "$APPDIR/usr/share/applications"
+
+# Install the icon into the hicolor theme so the .desktop's
+# Icon=lightmorphic-browser actually RESOLVES in application menus. The
+# AppImage's .DirIcon is already our logo, but menu entries created by
+# integration tools resolve the icon by NAME from the theme -- without a
+# themed icon they fall back to a generic/wrong icon (this is why the
+# menu still showed Chromium). Ship every standard size.
+for s in 16 32 48 64 128 256; do
+  d="$APPDIR/usr/share/icons/hicolor/${s}x${s}/apps"
+  mkdir -p "$d"
+  cp "$ROOT/assets/icon-${s}.png" "$d/lightmorphic-browser.png"
+done
+# Also overwrite Chromium's own installed-app logo (used if the browser is
+# ever run from an integrated /opt-style layout). Doesn't fix the compiled
+# window icon, but harmless and covers that path.
+cp "$ROOT/assets/icon-48.png" "$APPDIR/usr/bin/chromium/product_logo_48.png" 2>/dev/null || true
 # appstreamcli enforces (a) filename == <id> and (b) desktop-application
 # ids must be reverse-DNS -- both the appdata file and the applications
 # .desktop file it points at via <launchable> are named co.lightmorphic.browser
