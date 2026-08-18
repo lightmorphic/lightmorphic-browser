@@ -11,9 +11,9 @@
       <button class="rail-btn active" data-panel="notes" role="tab" aria-selected="true" data-tip="Notes" aria-label="Notes">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h9l3 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v3h3"/><path d="M6.5 9.5h7M6.5 12.5h7M6.5 15.5h4"/></svg>
       </button>
-      <button class="rail-btn" data-panel="panels" role="tab" aria-selected="false" data-tip="Panels" aria-label="Panels">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/><circle cx="5.5" cy="6" r="0.6" fill="currentColor" stroke="none"/></svg>
-      </button>
+      <!-- No separate "Panels" tab -- the pinned-site favicons further
+           down the rail ARE the panels UI; a redundant tab just confused
+           things. Clicking a favicon activates the panel view directly. -->
       <button class="rail-btn" data-panel="bookmarks" role="tab" aria-selected="false" data-tip="Bookmarks" aria-label="Bookmarks">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h10a.5.5 0 0 1 .5.5v13l-5.5-3.5L4.5 17V4a.5.5 0 0 1 .5-.5z"/></svg>
       </button>
@@ -68,8 +68,10 @@
         <div class="panel-list" id="snippetList"></div>
         <form id="addSnippetForm" class="add-row snippet-add-row">
           <input id="addSnippetLabel" type="text" placeholder="Label">
+          <input id="addSnippetAbbrev" type="text" placeholder="Abbreviation (optional) &mdash; e.g. ab#" autocomplete="off" spellcheck="false">
           <textarea id="addSnippetText" placeholder="Snippet text" required></textarea>
           <button type="submit" class="btn-primary">Save</button>
+          <p class="hint">With an abbreviation set, typing it in any text box on any page expands it instantly &mdash; e.g. <code>ab#</code> &rarr; your address.</p>
         </form>
       </section>
 

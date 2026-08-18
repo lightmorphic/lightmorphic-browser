@@ -171,27 +171,39 @@ async function checkForUpdate() {
   }
 }
 
-let activeDownloadId = null;
-
+// One click does the WHOLE update: download, then install + restart as
+// soon as the download completes. The old flow needed a second click on
+// the blue dot after the download finished -- which nobody realises, so
+// it read as "it downloads, but that's about it".
+//
+// The download id is kept in chrome.storage, NOT a module variable: a
+// 180MB AppImage takes minutes, the MV3 service worker gets killed after
+// ~30s idle, and a module variable dies with it -- so the completion
+// event compared against null and was silently ignored, leaving the
+// widget stuck on "downloading" forever. chrome.downloads.onChanged
+// re-wakes the worker; the id it needs must survive that death.
 async function downloadUpdate() {
   const { updateStatus } = await chrome.storage.local.get("updateStatus");
   if (updateStatus?.state !== "available" || !updateStatus.downloadUrl) return;
-  await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "downloading" } });
-  activeDownloadId = await chrome.downloads.download({ url: updateStatus.downloadUrl, saveAs: false });
+  const downloadId = await chrome.downloads.download({ url: updateStatus.downloadUrl, saveAs: false });
+  await chrome.storage.local.set({
+    updateStatus: { ...updateStatus, state: "downloading", downloadId, autoInstall: true },
+  });
 }
 
 chrome.downloads.onChanged.addListener(async (delta) => {
-  if (delta.id !== activeDownloadId) return;
   const { updateStatus } = await chrome.storage.local.get("updateStatus");
+  if (!updateStatus || updateStatus.downloadId !== delta.id) return;
   if (delta.state?.current === "complete") {
     // Record the absolute path of the downloaded AppImage so the native
     // updater knows what to install.
-    const [item] = await chrome.downloads.search({ id: activeDownloadId });
+    const [item] = await chrome.downloads.search({ id: delta.id });
     await chrome.storage.local.set({
-      updateStatus: { ...updateStatus, state: "ready", filePath: item?.filename, downloadId: activeDownloadId },
+      updateStatus: { ...updateStatus, state: "ready", filePath: item?.filename },
     });
     chrome.action.setBadgeText({ text: "✓" });
     chrome.action.setBadgeBackgroundColor({ color: "#2295F1" });
+    if (updateStatus.autoInstall) await installUpdate();
   } else if (delta.state?.current === "interrupted") {
     await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "error" } });
   }

@@ -1,7 +1,10 @@
 import { pull, push, isConfigured, setupSync } from "../sync/syncClient.js";
 
 // ---- Icon rail ----
-for (const btn of document.querySelectorAll(".rail-btn")) {
+// Only tab buttons (data-panel) switch views. The "+" button and the
+// pinned-site favicons are .rail-btn too but have their own handlers --
+// binding them here used to deactivate every view when "+" was clicked.
+for (const btn of document.querySelectorAll(".rail-btn[data-panel]")) {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".rail-btn").forEach((b) => {
       b.classList.toggle("active", b === btn);
@@ -48,9 +51,9 @@ function renderUpdateStatus(status) {
   const footerTitles = {
     checking: "Checking for updates…",
     ok: "Up to date — click to check again",
-    available: `Update available (${status?.latestTag ?? ""}) — click to download`,
-    downloading: "Downloading update…",
-    ready: "Downloaded — quit, swap the AppImage in place, relaunch",
+    available: `Update available (${status?.latestTag ?? ""}) — click to update & restart`,
+    downloading: "Downloading update — it will install and restart by itself…",
+    ready: "Downloaded — click to install & restart",
     error: "Can't reach GitHub to check for updates",
   };
   footerUpdateWidget.title = footerTitles[state] ?? "";
@@ -64,10 +67,10 @@ function renderUpdateStatus(status) {
     appUpdateDot.classList.add("update");
     updateStatusText.textContent = `Update available (${status.latestTag})`;
     updateActionBtn.hidden = false;
-    updateActionBtn.textContent = "Download update";
+    updateActionBtn.textContent = "Update & restart";
   } else if (state === "downloading") {
     appUpdateDot.classList.add("downloading");
-    updateStatusText.textContent = "Downloading…";
+    updateStatusText.textContent = "Downloading — installs & restarts by itself…";
   } else if (state === "ready") {
     appUpdateDot.classList.add("ready");
     updateStatusText.textContent = "Downloaded and ready";
@@ -317,10 +320,14 @@ siteForm.addEventListener("submit", async (e) => {
 });
 
 function openPanelSite(url) {
+  // Deactivate the tab buttons and highlight the favicon of the site
+  // being opened -- the favicons themselves are the "Panels" UI now.
   document.querySelectorAll(".rail-btn[data-panel]").forEach((b) => {
-    const on = b.dataset.panel === "panels";
-    b.classList.toggle("active", on);
-    b.setAttribute("aria-selected", String(on));
+    b.classList.remove("active");
+    b.setAttribute("aria-selected", "false");
+  });
+  document.querySelectorAll("#railSites .rail-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.url === url);
   });
   document.querySelectorAll(".panel-view").forEach((p) => {
     p.classList.toggle("active", p.id === "panel-panels");
@@ -381,6 +388,7 @@ function renderRailSites(webPanels) {
     }
     const btn = document.createElement("button");
     btn.className = "rail-btn";
+    btn.dataset.url = url;
     btn.title = host;
     const img = document.createElement("img");
     img.className = "rail-site-icon";
@@ -462,6 +470,7 @@ bookmarkCurrentPageBtn.addEventListener("click", async () => {
 const snippetList = document.getElementById("snippetList");
 const addSnippetForm = document.getElementById("addSnippetForm");
 const addSnippetLabel = document.getElementById("addSnippetLabel");
+const addSnippetAbbrev = document.getElementById("addSnippetAbbrev");
 const addSnippetText = document.getElementById("addSnippetText");
 
 async function loadSnippets() {
@@ -472,7 +481,9 @@ async function loadSnippets() {
     item.className = "panel-item";
 
     const label = document.createElement("span");
-    label.textContent = snippet.label || snippet.text.slice(0, 40);
+    label.textContent =
+      (snippet.abbrev ? `${snippet.abbrev} → ` : "") +
+      (snippet.label || snippet.text.slice(0, 40));
     label.title = snippet.text;
 
     const remove = document.createElement("button");
@@ -494,9 +505,18 @@ addSnippetForm.addEventListener("submit", async (e) => {
   const text = addSnippetText.value.trim();
   if (!text) return;
   const { snippets = [] } = await chrome.storage.local.get("snippets");
-  const next = [...snippets, { id: crypto.randomUUID(), label: addSnippetLabel.value.trim(), text }];
+  const next = [
+    ...snippets,
+    {
+      id: crypto.randomUUID(),
+      label: addSnippetLabel.value.trim(),
+      abbrev: addSnippetAbbrev.value.trim(),
+      text,
+    },
+  ];
   await chrome.storage.local.set({ snippets: next });
   addSnippetLabel.value = "";
+  addSnippetAbbrev.value = "";
   addSnippetText.value = "";
   loadSnippets();
 });

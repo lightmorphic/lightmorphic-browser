@@ -121,6 +121,26 @@ echo "==> Bundling self-updater native host"
 cp "$ROOT/appimage/lmb-updater" "$APPDIR/usr/share/lightmorphic-browser/lmb-updater"
 chmod +x "$APPDIR/usr/share/lightmorphic-browser/lmb-updater"
 
+echo "==> Bundling xdotool (sidebar auto-open helper)"
+# Chromium's sidePanel API refuses to open without a real user gesture and
+# never restores the panel across restarts (verified empirically on 151:
+# gestureless open throws, and no Preferences key records the open panel).
+# The only reliable way to have the sidebar ALREADY OPEN on startup is to
+# synthesise the real input Chromium demands: AppRun presses the
+# extension's Ctrl+Shift+L command (a genuine XTEST key event = a valid
+# user gesture) once the window is up. That needs xdotool, which can't be
+# assumed on the user's machine -- so bundle it with its one non-X lib.
+# X11-only by nature; on pure Wayland the press is a harmless no-op and
+# the shortcut still works manually.
+if command -v xdotool >/dev/null 2>&1; then
+  cp "$(command -v xdotool)" "$APPDIR/usr/bin/xdotool"
+  for lib in $(ldd "$(command -v xdotool)" | awk '/libxdo/ {print $3}'); do
+    cp "$lib" "$APPDIR/usr/bin/"
+  done
+else
+  echo "==> WARNING: xdotool not installed on build machine; sidebar auto-open will be skipped" >&2
+fi
+
 echo "==> Writing launcher"
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/usr/bin/env bash
@@ -200,13 +220,12 @@ done
 # an isolated nested X display, not guessed) against this Chromium build,
 # only on a genuine first run so a user's own later choices aren't fought:
 #
-# 1. pinned_extensions -- the real top-level key (NOT nested under
-#    "extensions", despite that being the more "logical" guess that
-#    silently did nothing when tried first). Confirmed correct by manually
-#    pinning via the UI and diffing the file, but pre-seeding it before
-#    first launch did not reliably paint the icon on first render in
-#    testing -- worth keeping since it's the genuinely correct value, but
-#    a user may still need one manual pin click the very first time.
+# 1. extensions.pinned_extensions -- NESTED under "extensions" on this
+#    Chromium 151 line. Re-verified 2026-08-18 by pinning via the UI on a
+#    clean profile and diffing Preferences: the ONLY change was
+#    extensions.pinned_extensions = [<id>]. (An earlier note here claimed
+#    the key was top-level -- that was wrong, which is why the icon never
+#    pinned by default.)
 # 2. extensions.ui.developer_mode -- this is the more important fix. An
 #    extension loaded via --load-extension survives the FIRST launch, but
 #    gets silently DISABLED on a reload/relaunch ("Turn on developer mode
@@ -242,8 +261,8 @@ if [ ! -f "$PROFILE_DIR/Preferences" ]; then
 LOCALSTATE
   cat > "$PROFILE_DIR/Preferences" <<'PREFS'
 {
-  "pinned_extensions": ["hokpgjhmbdcggofdeaaobeknogcmlbfa"],
   "extensions": {
+    "pinned_extensions": ["hokpgjhmbdcggofdeaaobeknogcmlbfa"],
     "ui": {
       "developer_mode": true
     }
@@ -324,6 +343,31 @@ fi
 #                                      skips the upstream search-engine
 #                                      prompt (cosmetic, not itself a privacy
 #                                      fix)
+# --- Sidebar auto-open ---
+# The sidebar should be OPEN when the browser starts, not need a click
+# every session. Chromium's sidePanel API hard-requires a user gesture
+# and never restores the panel across restarts, so the only reliable
+# mechanism is to synthesise the gesture: wait for our window, then press
+# the extension's Ctrl+Shift+L command via bundled xdotool (XTEST input =
+# a genuine gesture). Pressed twice a few seconds apart in case the
+# extension registers its shortcut after the window first paints.
+# Harmless if repeated -- the handler opens the panel, never toggles it
+# shut. Skipped cleanly when there's no X display or xdotool didn't ship.
+if [ -n "${DISPLAY:-}" ] && [ -x "$HERE/usr/bin/xdotool" ]; then
+  setsid bash -c '
+    XD="'"$HERE"'/usr/bin/xdotool"
+    export LD_LIBRARY_PATH="'"$HERE"'/usr/bin:${LD_LIBRARY_PATH:-}"
+    for _ in $(seq 1 60); do
+      "$XD" search --onlyvisible --class lightmorphic-browser >/dev/null 2>&1 && break
+      sleep 0.25
+    done
+    sleep 1.5
+    "$XD" key --clearmodifiers ctrl+shift+l 2>/dev/null || true
+    sleep 2.5
+    "$XD" key --clearmodifiers ctrl+shift+l 2>/dev/null || true
+  ' </dev/null >/dev/null 2>&1 &
+fi
+
 # --class sets the window's WM_CLASS. Without it Chromium reports
 # "chrome"/"Chrome", so desktop environments (Cinnamon/GNOME) match the
 # window to the system Chromium's .desktop and show the Chromium icon in

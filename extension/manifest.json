@@ -24,6 +24,14 @@
   "side_panel": {
     "default_path": "sidebar/sidebar.html"
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L"
+      },
+      "description": "Open the LMB sidebar"
+    }
+  },
   "chrome_url_overrides": {
     "newtab": "newtab/newtab.html"
   },

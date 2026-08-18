@@ -596,6 +596,54 @@
   broken build shipped. Worth adding a headless "does the extension load
   from a read-only copy" smoke test to build.sh/CI.
 
+- **v0.16: one-click update, sidebar auto-open, pinned toolbar icon, text
+  expander, rail cleanup** (2026-08-18). All verified on the locally-built
+  AppImage on an ISOLATED Xephyr + isolated $HOME (see testing rule below).
+  - *One-click update.* Two real defects found and fixed. (1) The download
+    id lived in a service-worker module variable; a 180MB download outlives
+    the SW's ~30s idle kill, so the completion event compared against null
+    and was ignored -- stuck on "downloading" forever ("it downloads, but
+    that's about it"). Id now persisted in updateStatus. (2) The flow needed
+    a second click after download (yellow->download, then blue->install)
+    which nobody realises. Now autoInstall:true is set when the download
+    starts and the completion handler calls installUpdate() itself.
+    Verified live: ONE click on the yellow footer dot -> downloaded ->
+    native host swapped the AppImage (md5 confirmed) -> browser restarted
+    itself -> tabs restored -> sidebar auto-opened again.
+  - *Sidebar auto-open on startup.* sidePanel.open() hard-requires a user
+    gesture (verified: gestureless call throws) and Chromium never restores
+    the panel across restarts (verified: opened panel, clean quit, relaunch
+    -> gone; no Preferences key records it). Solution: manifest command
+    Ctrl+Shift+L (_execute_action -> action.onClicked -> sidePanel.open),
+    plus AppRun bundles xdotool + libxdo and presses the shortcut (XTEST =
+    genuine gesture) once the window appears, twice 2.5s apart for the
+    late-registration race. X11-only; graceful no-op on pure Wayland.
+    Verified: fresh profile launch -> panel open with zero clicks; also
+    reopens after the self-update relaunch.
+  - *Toolbar icon pinned by default.* The seeded pref was WRONG: the real
+    key on 151 is extensions.pinned_extensions (nested), not top-level
+    pinned_extensions. Re-verified by pinning via the UI on a clean profile
+    and diffing Preferences (the only change). Icon now pinned from first
+    run.
+  - *Rail cleanup.* Removed the redundant "Panels" tab (the pinned-site
+    favicons ARE the panels UI); favicon click activates the panel view
+    directly and the active favicon gets the highlight. Also fixed: the
+    static rail-click binding used to include the "+" button (no
+    data-panel), so clicking + deactivated every view.
+  - *Text expander.* Snippets have an optional abbreviation ("ab#"); the
+    content script expands it the moment it's typed in any input/textarea/
+    contenteditable on any page (word-boundary guarded, longest-first,
+    e.isTrusted-guarded against loops, storage.onChanged keeps the map
+    fresh). Verified with real synthetic-keystroke typing: "ab#" ->
+    full address, mid-sentence, in a page textarea.
+
+- **TESTING RULE (learned the hard way): NEVER run QA browsers against the
+  real profile.** AppRun uses $HOME/.config/lightmorphic-browser, so a test
+  launch with the user's $HOME writes into their real profile -- a
+  Wikipedia pin from v0.13 testing leaked into the user's browser this way.
+  Always: `HOME=/tmp/<qa-dir> DISPLAY=:99 <appimage>` so profile, native
+  host registration, Downloads, everything stays sandboxed.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

@@ -40,6 +40,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Install xdotool (bundled for sidebar auto-open)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xdotool
       - name: Fetch FUSE3-compatible appimagetool
         run: |
           # Asset filenames embed a build number that changes (e.g.
