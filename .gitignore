@@ -1,6 +1,6 @@
 node_modules/
 dist/
-appimage/AppDir/usr/
+appimage/AppDir/
 appimage/appimagetool
 appimage/chrome-linux.zip
 *.log

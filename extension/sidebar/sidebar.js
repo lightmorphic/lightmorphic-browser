@@ -25,13 +25,34 @@ const railUpdateDot = document.getElementById("railUpdateDot");
 const updateStatusText = document.getElementById("updateStatusText");
 const updateActionBtn = document.getElementById("updateActionBtn");
 const updateHint = document.getElementById("updateHint");
+const footerUpdateDot = document.getElementById("footerUpdateDot");
+const footerUpdateVersion = document.getElementById("footerUpdateVersion");
+const footerUpdateWidget = document.getElementById("footerUpdateWidget");
+
+const DOT_CLASS = { ok: "ok", available: "update", downloading: "downloading", ready: "ready", error: "error" };
+
+let currentUpdateState = "checking";
 
 function renderUpdateStatus(status) {
   const state = status?.state || "checking";
+  currentUpdateState = state;
   appUpdateDot.className = "status-dot";
   updateActionBtn.hidden = true;
   updateHint.textContent = "";
   railUpdateDot.hidden = state !== "available" && state !== "ready";
+
+  // The permanent footer widget mirrors the same state.
+  footerUpdateDot.className = "update-dot";
+  if (DOT_CLASS[state]) footerUpdateDot.classList.add(DOT_CLASS[state]);
+  const footerTitles = {
+    checking: "Checking for updates…",
+    ok: "Up to date — click to check again",
+    available: `Update available (${status?.latestTag ?? ""}) — click to download`,
+    downloading: "Downloading update…",
+    ready: "Downloaded — quit, swap the AppImage in place, relaunch",
+    error: "Can't reach GitHub to check for updates",
+  };
+  footerUpdateWidget.title = footerTitles[state] ?? "";
 
   if (state === "checking") {
     updateStatusText.textContent = "Checking for updates…";
@@ -58,12 +79,25 @@ function renderUpdateStatus(status) {
 }
 
 async function loadUpdateStatus() {
+  const info = await fetch(chrome.runtime.getURL("version.json")).then((r) => r.json());
+  footerUpdateVersion.textContent = info.browserVersion ? `v${info.browserVersion}` : info.releaseTag;
   const { updateStatus } = await chrome.storage.local.get("updateStatus");
   renderUpdateStatus(updateStatus);
 }
 
 updateActionBtn.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "lightmorphic-download-update" });
+});
+
+// Footer widget: same click affordances as the new-tab widget.
+footerUpdateWidget.addEventListener("click", () => {
+  if (currentUpdateState === "available") {
+    chrome.runtime.sendMessage({ type: "lightmorphic-download-update" });
+  } else if (currentUpdateState === "ok" || currentUpdateState === "error") {
+    footerUpdateDot.classList.add("pulse");
+    setTimeout(() => footerUpdateDot.classList.remove("pulse"), 1300);
+    chrome.runtime.sendMessage({ type: "lightmorphic-check-update" });
+  }
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -74,6 +108,57 @@ chrome.storage.onChanged.addListener((changes, area) => {
 document.getElementById("changeSearchEngineBtn").addEventListener("click", () => {
   chrome.tabs.create({ url: "chrome://settings/searchEngines" });
 });
+
+// ---- Framing pinned sites ----
+// Most big sites (BBC, Google, etc.) send X-Frame-Options or a CSP
+// frame-ancestors directive that forbids being loaded in an iframe --
+// so a plain iframe just shows "refused to connect". To load them in
+// the panel we strip those response headers, but ONLY for the exact
+// host the user deliberately pinned/opened, via a per-host session
+// declarativeNetRequest rule. Clickjacking protection stays fully intact
+// for every other site in the browser; the tradeoff is limited to sites
+// the user explicitly chose to embed. (DNR can only remove a whole
+// header, not edit within CSP, so the site's entire CSP is dropped for
+// its framed load -- documented, and scoped to that one host.)
+function hostRuleId(host) {
+  let h = 0;
+  for (let i = 0; i < host.length; i++) h = (h * 31 + host.charCodeAt(i)) & 0x7fffffff;
+  return (h % 2000000000) + 1; // DNR ids must be >= 1
+}
+
+async function allowFramingFor(url) {
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return;
+  }
+  const id = hostRuleId(host);
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [id],
+    addRules: [
+      {
+        id,
+        priority: 1,
+        action: {
+          type: "modifyHeaders",
+          responseHeaders: [
+            { header: "x-frame-options", operation: "remove" },
+            { header: "content-security-policy", operation: "remove" },
+            { header: "content-security-policy-report-only", operation: "remove" },
+          ],
+        },
+        condition: { requestDomains: [host], resourceTypes: ["sub_frame"] },
+      },
+    ],
+  });
+}
+
+async function loadInFrame(frame, url) {
+  await allowFramingFor(url);
+  frame.src = url;
+  frame.hidden = false;
+}
 
 // ---- Notepad ----
 const notepad = document.getElementById("notepad");
@@ -135,8 +220,7 @@ function openPanelSite(url) {
   document.querySelectorAll(".panel-view").forEach((p) => {
     p.classList.toggle("active", p.id === "panel-panels");
   });
-  webPanelFrame.src = url;
-  webPanelFrame.hidden = false;
+  loadInFrame(webPanelFrame, url);
 }
 
 function renderRailSites(webPanels) {
@@ -175,10 +259,7 @@ async function loadWebPanels() {
 
     const label = document.createElement("span");
     label.textContent = url;
-    label.addEventListener("click", () => {
-      webPanelFrame.src = url;
-      webPanelFrame.hidden = false;
-    });
+    label.addEventListener("click", () => loadInFrame(webPanelFrame, url));
 
     const remove = document.createElement("button");
     remove.textContent = "×";
@@ -220,8 +301,7 @@ pinCurrentPageBtn.addEventListener("click", async () => {
     return;
   }
   await pinUrl(tab.url);
-  webPanelFrame.src = tab.url;
-  webPanelFrame.hidden = false;
+  loadInFrame(webPanelFrame, tab.url);
 });
 
 // ---- Bookmarks ----
@@ -251,8 +331,7 @@ async function loadBookmarks() {
       link.textContent = node.title || node.url;
       link.addEventListener("click", (e) => {
         e.preventDefault();
-        bookmarkFrame.src = node.url;
-        bookmarkFrame.hidden = false;
+        loadInFrame(bookmarkFrame, node.url);
       });
       container.appendChild(link);
     }

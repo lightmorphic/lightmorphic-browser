@@ -326,6 +326,30 @@
   verified gesture restriction: the panel persists across tab switches
   once opened, but nothing extension-side can force it open at launch.
 
+- **v0.03: permanent update footer, cross-origin framing fix** (2026-08-18).
+  - Charlie's point: the update widget lived only on the new-tab page,
+    which is replaceable, so the update system could vanish. Moved it to
+    a **dedicated always-visible footer at the bottom of the side panel**
+    (name + version beside the house coloured circle, same
+    green/yellow/ring/blue/red states, click-to-act). The new-tab widget
+    stays too, but the panel footer is now the durable home. Verified
+    live: footer shows "LMB v0.02" with a green dot on the built AppImage.
+  - **Fixed "BBC refuses to connect" in the panel** — the real cause was
+    `X-Frame-Options` / CSP `frame-ancestors` response headers that
+    forbid a site being iframed. `loadInFrame()` now adds a **per-host**
+    session `declarativeNetRequest` rule that strips those headers only
+    for the exact host the user pinned/opened (`requestDomains: [host]`,
+    `resourceTypes: ["sub_frame"]`), so clickjacking protection stays
+    intact for every other site — the tradeoff is scoped to sites the
+    user explicitly chose to embed. Verified live: navigated the main tab
+    to bbc.com, hit the rail "+", and BBC's full homepage (cookie banner,
+    headlines, images) rendered inside the panel instead of "refused to
+    connect". DNR can only remove a whole header, not edit within CSP, so
+    the pinned host's entire CSP is dropped for its framed load —
+    documented, host-scoped.
+  - Cleanup: `appimage/AppDir/` was partially tracked in git from an
+    early commit; now fully gitignored and untracked.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
