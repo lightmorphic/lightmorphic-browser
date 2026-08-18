@@ -38,6 +38,7 @@ function renderUpdateStatus(status) {
   currentUpdateState = state;
   appUpdateDot.className = "status-dot";
   updateActionBtn.hidden = true;
+  updateActionBtn.dataset.action = "download";
   updateHint.textContent = "";
   railUpdateDot.hidden = state !== "available" && state !== "ready";
 
@@ -70,8 +71,12 @@ function renderUpdateStatus(status) {
   } else if (state === "ready") {
     appUpdateDot.classList.add("ready");
     updateStatusText.textContent = "Downloaded and ready";
-    updateHint.textContent =
-      "Saved to your Downloads folder. An extension can't replace the running AppImage itself -- quit, swap the old file for the new one, and relaunch.";
+    updateActionBtn.hidden = false;
+    updateActionBtn.textContent = "Install & restart";
+    updateActionBtn.dataset.action = "install";
+    updateHint.textContent = status?.manual
+      ? "Couldn't auto-install -- the new file was revealed in your Downloads. Replace your current LMB AppImage with it and relaunch."
+      : "Installs the downloaded update and restarts the browser. Your tabs are restored afterwards.";
   } else {
     appUpdateDot.classList.add("error");
     updateStatusText.textContent = "Couldn't check for updates";
@@ -86,13 +91,21 @@ async function loadUpdateStatus() {
 }
 
 updateActionBtn.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "lightmorphic-download-update" });
+  const type =
+    updateActionBtn.dataset.action === "install"
+      ? "lightmorphic-install-update"
+      : "lightmorphic-download-update";
+  chrome.runtime.sendMessage({ type });
 });
 
-// Footer widget: same click affordances as the new-tab widget.
+// Footer widget click affordances by state:
+//   available -> download; ready (blue) -> install & restart;
+//   ok/error -> re-check.
 footerUpdateWidget.addEventListener("click", () => {
   if (currentUpdateState === "available") {
     chrome.runtime.sendMessage({ type: "lightmorphic-download-update" });
+  } else if (currentUpdateState === "ready") {
+    chrome.runtime.sendMessage({ type: "lightmorphic-install-update" });
   } else if (currentUpdateState === "ok" || currentUpdateState === "error") {
     footerUpdateDot.classList.add("pulse");
     setTimeout(() => footerUpdateDot.classList.remove("pulse"), 1300);

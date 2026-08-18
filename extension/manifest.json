@@ -35,6 +35,7 @@
     "scripting",
     "tabs",
     "downloads",
+    "nativeMessaging",
     "declarativeNetRequestWithHostAccess",
     "clipboardRead",
     "clipboardWrite",

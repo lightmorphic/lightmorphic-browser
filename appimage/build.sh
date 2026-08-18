@@ -102,6 +102,10 @@ echo "==> Bundling theme"
 mkdir -p "$APPDIR/usr/share/lightmorphic-browser/theme"
 cp -r "$ROOT/theme/." "$APPDIR/usr/share/lightmorphic-browser/theme/"
 
+echo "==> Bundling self-updater native host"
+cp "$ROOT/appimage/lmb-updater" "$APPDIR/usr/share/lightmorphic-browser/lmb-updater"
+chmod +x "$APPDIR/usr/share/lightmorphic-browser/lmb-updater"
+
 echo "==> Writing launcher"
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/usr/bin/env bash
@@ -111,6 +115,40 @@ THEME="$HERE/usr/share/lightmorphic-browser/theme"
 LOAD_PATHS="$EXT,$THEME"
 USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
 PROFILE_DIR="$USER_DATA_DIR/Default"
+
+# --- Self-updater plumbing (for the "click blue to install & restart"
+# flow). The extension talks to a native-messaging host that swaps the
+# AppImage and relaunches. Two things must be set up before Chromium
+# starts:
+#   1. Record where THIS AppImage lives on disk. $APPIMAGE is set by the
+#      AppImage runtime; save it so the updater knows what file to
+#      replace (the in-AppImage mount path is ephemeral, the real file
+#      isn't).
+#   2. Register the native host manifest so Chromium will launch our
+#      updater when the extension connects to it. The user-level manifest
+#      dir on Linux is <config>/<product>/NativeMessagingHosts; the exact
+#      product dir for a snapshot build isn't guaranteed, so write to the
+#      likely candidates -- an unused one is harmless.
+mkdir -p "$USER_DATA_DIR"
+[ -n "${APPIMAGE:-}" ] && printf '%s' "$APPIMAGE" > "$USER_DATA_DIR/appimage-path"
+UPDATER="$HERE/usr/share/lightmorphic-browser/lmb-updater"
+NM_MANIFEST=$(cat <<JSON
+{
+  "name": "co.lightmorphic.updater",
+  "description": "LMB self-updater",
+  "path": "$UPDATER",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://hokpgjhmbdcggofdeaaobeknogcmlbfa/"]
+}
+JSON
+)
+for nmdir in \
+  "$USER_DATA_DIR/NativeMessagingHosts" \
+  "$HOME/.config/chromium/NativeMessagingHosts" \
+  "$HOME/.config/google-chrome/NativeMessagingHosts"; do
+  mkdir -p "$nmdir"
+  printf '%s' "$NM_MANIFEST" > "$nmdir/co.lightmorphic.updater.json"
+done
 
 # Extension has a fixed "key" in its manifest (see extension/manifest.json)
 # so its ID is stable (hokpgjhmbdcggofdeaaobeknogcmlbfa) instead of

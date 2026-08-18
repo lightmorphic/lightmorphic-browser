@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Native-messaging host for LMB's "click blue to install & restart".
+#
+# An extension can't replace the running AppImage or relaunch the browser
+# from inside its sandbox -- the only bridge to native code is a native
+# messaging host, which this is. It:
+#   1. reads one native message ({"action":"install","new":"<path>"}),
+#   2. copies the downloaded AppImage over the currently-running one
+#      (path from <user-data-dir>/appimage-path, written by AppRun),
+#   3. launches a detached relauncher that waits for this browser to exit
+#      then starts the new binary,
+#   4. asks the browser to quit (SIGTERM -> clean shutdown, session is
+#      restored by "continue where you left off").
+#
+# Pure bash + coreutils only -- no python/node assumed on the user's box.
+set -euo pipefail
+
+USER_DATA_DIR="${HOME}/.config/lightmorphic-browser"
+LOG="${USER_DATA_DIR}/updater.log"
+exec 2>>"$LOG"
+echo "=== updater invoked $(date -u +%FT%TZ) ===" >&2
+
+# --- read one native message: 4-byte LE length, then that many bytes ---
+len_raw=$(dd bs=1 count=4 2>/dev/null | od -An -tu1)
+[ -n "$len_raw" ] || { echo "no length header" >&2; exit 0; }
+len=$(echo "$len_raw" | awk '{print $1 + $2*256 + $3*65536 + $4*16777216}')
+msg=$(dd bs=1 count="$len" 2>/dev/null)
+echo "message: $msg" >&2
+
+# Extract the "new" path from the JSON (simple, message is ours).
+new_path=$(printf '%s' "$msg" | sed -n 's/.*"new"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+echo "new_path: $new_path" >&2
+
+target=""
+if [ -f "${USER_DATA_DIR}/appimage-path" ]; then
+  target=$(cat "${USER_DATA_DIR}/appimage-path")
+fi
+[ -z "$target" ] && target="${APPIMAGE:-}"
+echo "target: $target" >&2
+
+# --- send a one-line ack back so the extension knows we started ---
+reply='{"status":"installing"}'
+rlen=${#reply}
+printf "$(printf '\\x%02x\\x%02x\\x%02x\\x%02x' \
+  $((rlen & 255)) $(((rlen>>8) & 255)) $(((rlen>>16) & 255)) $(((rlen>>24) & 255)))"
+printf '%s' "$reply"
+
+if [ -z "$new_path" ] || [ ! -f "$new_path" ] || [ -z "$target" ]; then
+  echo "missing new_path or target -- aborting" >&2
+  exit 0
+fi
+
+# --- swap the AppImage in place (atomic rename within the same dir) ---
+tmp="${target}.new-$$"
+cp -f "$new_path" "$tmp"
+chmod +x "$tmp"
+mv -f "$tmp" "$target"
+echo "swapped $target" >&2
+
+# --- detached relauncher: wait for this browser to exit, then start new ---
+setsid bash -c '
+  t="'"$target"'"
+  for _ in $(seq 1 120); do
+    pgrep -f "$t" >/dev/null 2>&1 || break
+    sleep 0.5
+  done
+  exec "$t"
+' </dev/null >/dev/null 2>&1 &
+
+# --- ask the browser to quit (the no --type= chrome process = browser) ---
+for pid in $(pgrep -f "chromium/chrome" 2>/dev/null || true); do
+  if ! tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q -- '--type='; then
+    echo "SIGTERM browser pid $pid" >&2
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
+done
+
+exit 0

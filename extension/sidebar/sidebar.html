@@ -8,29 +8,29 @@
 <body>
   <div class="shell">
     <nav class="rail" role="tablist" aria-label="Sidebar sections">
-      <button class="rail-btn active" data-panel="notes" role="tab" aria-selected="true" title="Notes">
+      <button class="rail-btn active" data-panel="notes" role="tab" aria-selected="true" data-tip="Notes" aria-label="Notes">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h9l3 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v3h3"/><path d="M6.5 9.5h7M6.5 12.5h7M6.5 15.5h4"/></svg>
       </button>
-      <button class="rail-btn" data-panel="panels" role="tab" aria-selected="false" title="Panels">
+      <button class="rail-btn" data-panel="panels" role="tab" aria-selected="false" data-tip="Panels" aria-label="Panels">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/><circle cx="5.5" cy="6" r="0.6" fill="currentColor" stroke="none"/></svg>
       </button>
-      <button class="rail-btn" data-panel="bookmarks" role="tab" aria-selected="false" title="Bookmarks">
+      <button class="rail-btn" data-panel="bookmarks" role="tab" aria-selected="false" data-tip="Bookmarks" aria-label="Bookmarks">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h10a.5.5 0 0 1 .5.5v13l-5.5-3.5L4.5 17V4a.5.5 0 0 1 .5-.5z"/></svg>
       </button>
-      <button class="rail-btn" data-panel="snippets" role="tab" aria-selected="false" title="Quick paste snippets">
+      <button class="rail-btn" data-panel="snippets" role="tab" aria-selected="false" data-tip="Quick paste snippets" aria-label="Quick paste snippets">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.2"/><path d="M8 3.5h4a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M7.5 9h5M7.5 12h5"/></svg>
       </button>
       <div class="rail-divider"></div>
       <!-- Pinned sites render here as favicon buttons, Vivaldi-style -->
       <div class="rail-sites" id="railSites"></div>
-      <button class="rail-btn" id="railAddSite" type="button" title="Pin the page you're on now">
+      <button class="rail-btn" id="railAddSite" type="button" data-tip="Pin this page" aria-label="Pin the page you're on now">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4.5v11M4.5 10h11"/></svg>
       </button>
       <div class="rail-spacer"></div>
-      <button class="rail-btn" id="railThemeToggle" type="button" title="Light / dark">
+      <button class="rail-btn" id="railThemeToggle" type="button" data-tip="Light / dark" aria-label="Light / dark">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></svg>
       </button>
-      <button class="rail-btn rail-btn-settings" data-panel="settings" role="tab" aria-selected="false" title="Settings">
+      <button class="rail-btn rail-btn-settings" data-panel="settings" role="tab" aria-selected="false" data-tip="Settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="rail-dot" id="railUpdateDot" hidden></span>
       </button>

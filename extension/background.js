@@ -184,7 +184,12 @@ chrome.downloads.onChanged.addListener(async (delta) => {
   if (delta.id !== activeDownloadId) return;
   const { updateStatus } = await chrome.storage.local.get("updateStatus");
   if (delta.state?.current === "complete") {
-    await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "ready" } });
+    // Record the absolute path of the downloaded AppImage so the native
+    // updater knows what to install.
+    const [item] = await chrome.downloads.search({ id: activeDownloadId });
+    await chrome.storage.local.set({
+      updateStatus: { ...updateStatus, state: "ready", filePath: item?.filename, downloadId: activeDownloadId },
+    });
     chrome.action.setBadgeText({ text: "✓" });
     chrome.action.setBadgeBackgroundColor({ color: "#2295F1" });
   } else if (delta.state?.current === "interrupted") {
@@ -192,9 +197,40 @@ chrome.downloads.onChanged.addListener(async (delta) => {
   }
 });
 
+// Blue "ready" state clicked -> hand the downloaded AppImage to the native
+// updater, which swaps it in and relaunches. If the native host isn't
+// present (e.g. running the unpacked extension outside the AppImage, or a
+// packaging where registration didn't happen), fall back to revealing the
+// file so the user can swap it manually -- so the click never silently
+// does nothing.
+async function installUpdate() {
+  const { updateStatus } = await chrome.storage.local.get("updateStatus");
+  if (updateStatus?.state !== "ready" || !updateStatus.filePath) return;
+
+  let handled = false;
+  try {
+    const port = chrome.runtime.connectNative("co.lightmorphic.updater");
+    port.onMessage.addListener(() => {
+      handled = true; // updater acked; the browser is about to be restarted
+    });
+    port.onDisconnect.addListener(async () => {
+      if (!handled) {
+        // Host not found / failed to start -> manual fallback.
+        if (updateStatus.downloadId != null) chrome.downloads.show(updateStatus.downloadId);
+        await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "ready", manual: true } });
+      }
+    });
+    port.postMessage({ action: "install", new: updateStatus.filePath });
+  } catch {
+    if (updateStatus.downloadId != null) chrome.downloads.show(updateStatus.downloadId);
+    await chrome.storage.local.set({ updateStatus: { ...updateStatus, state: "ready", manual: true } });
+  }
+}
+
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "lightmorphic-download-update") downloadUpdate();
   if (message?.type === "lightmorphic-check-update") checkForUpdate();
+  if (message?.type === "lightmorphic-install-update") installUpdate();
   return false;
 });
 

@@ -6,6 +6,9 @@
   --accent: #fbc711; --accent-hover: #ddaf0f; --on-accent: #645007;
   --radius: 0.875rem;
   --rail-width: 44px;
+  /* Tooltip: dark bubble on light mode (contrasts with the page),
+     reversed on dark mode. */
+  --tip-bg: #111827; --tip-fg: #ffffff;
 }
 
 /* Dark values. Applied when the OS prefers dark AND the user hasn't
@@ -16,6 +19,7 @@
     --bg: #09090b; --fg: #fafafa;
     --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
     --border: #27272a; --muted: #1c1c1f; --muted-fg: #a1a1aa;
+    --tip-bg: #fafafa; --tip-fg: #111827;
   }
 }
 
@@ -23,6 +27,7 @@
   --bg: #09090b; --fg: #fafafa;
   --panel: #1b1d29; --panel-border: rgba(255,255,255,.09);
   --border: #27272a; --muted: #1c1c1f; --muted-fg: #a1a1aa;
+  --tip-bg: #fafafa; --tip-fg: #111827;
 }
 
 * { box-sizing: border-box; }
@@ -97,6 +102,47 @@ body {
 }
 
 .rail-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Custom tooltips (house speech-bubble style), shown to the LEFT of the
+   rail since the rail sits on the right edge. 400ms hover delay. Dark
+   bubble on light mode, light bubble on dark mode (see --tip-* vars). */
+.rail-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(100% + 9px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 6px 9px;
+  border-radius: 7px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.20);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease 0.4s;
+  z-index: 60;
+}
+
+.rail-btn[data-tip]::before {
+  content: "";
+  position: absolute;
+  right: calc(100% + 3px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: var(--tip-bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease 0.4s;
+  z-index: 60;
+}
+
+.rail-btn[data-tip]:hover::after,
+.rail-btn[data-tip]:hover::before { opacity: 1; }
 
 .rail-spacer { flex: 1; }
 

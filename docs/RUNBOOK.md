@@ -387,6 +387,30 @@
   is kept and framed as a privacy virtue — the opposite of Chrome's
   un-removable Google integration.
 
+- **v0.07: working "install & restart" self-updater, custom tooltips**
+  (2026-08-18). The blue "downloaded, ready" update state did nothing on
+  click -- there was no handler for it. Built a real self-updater: an
+  extension can't replace the running AppImage or restart the browser
+  from its sandbox, so a **native-messaging host** (`appimage/lmb-updater`,
+  pure bash) bridges to native code. AppRun registers the host manifest
+  (into `<user-data-dir>/NativeMessagingHosts` + the chromium/chrome
+  config dirs, belt-and-suspenders) and records the running AppImage path
+  (`$APPIMAGE`) on each launch. Blue click -> background `connectNative`
+  -> host copies the downloaded AppImage over the running one, SIGTERMs
+  the browser (clean shutdown, tabs restored by "continue where you left
+  off"), and a detached relauncher starts the new binary. **Verified
+  end-to-end via CDP** on a directly-run AppImage: the host launched, the
+  target file's sha changed to the staged update's sha (swap confirmed),
+  the browser was SIGTERM'd, and a new instance relaunched. Fallback: if
+  the native host isn't reachable (e.g. unpacked-extension dev run), blue
+  reveals the downloaded file instead, so it never silently does nothing.
+  - Custom house-style tooltips on the rail buttons (replacing native
+    `title=`): dark bubble + arrow on light mode, reversed (light bubble)
+    on dark mode, 400ms hover delay, positioned left of the right-edge
+    rail. CSS-only via `data-tip`; a clean live screenshot didn't come
+    through this session (display flakiness) but the CSS is standard and
+    syntax-checked -- worth an eyeball on the next real run.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
