@@ -65,13 +65,14 @@
       </section>
 
       <section id="panel-snippets" class="panel-view">
+        <h2 class="settings-heading">Snippets &amp; text expander</h2>
+        <p class="hint">Right-click any text box &rarr; Quick paste to insert a snippet. Give one a <strong>shortcut</strong> and typing it anywhere expands instantly &mdash; e.g. <code>12#</code> &rarr; your phone number.</p>
         <div class="panel-list" id="snippetList"></div>
         <form id="addSnippetForm" class="add-row snippet-add-row">
-          <input id="addSnippetLabel" type="text" placeholder="Label">
-          <input id="addSnippetAbbrev" type="text" placeholder="Abbreviation (optional) &mdash; e.g. ab#" autocomplete="off" spellcheck="false">
-          <textarea id="addSnippetText" placeholder="Snippet text" required></textarea>
+          <input id="addSnippetLabel" type="text" placeholder="Label &mdash; e.g. Phone">
+          <input id="addSnippetAbbrev" type="text" placeholder="Shortcut (optional) &mdash; e.g. 12#" autocomplete="off" spellcheck="false">
+          <textarea id="addSnippetText" placeholder="Text to insert &mdash; e.g. 07700 900123" required></textarea>
           <button type="submit" class="btn-primary">Save</button>
-          <p class="hint">With an abbreviation set, typing it in any text box on any page expands it instantly &mdash; e.g. <code>ab#</code> &rarr; your address.</p>
         </form>
       </section>
 

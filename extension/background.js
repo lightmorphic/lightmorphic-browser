@@ -307,6 +307,12 @@ async function runSyncPass() {
 // alive across the retries (a bare setTimeout gets killed when the worker
 // suspends after the event handler returns -- that's why the first
 // attempt at this didn't work).
+//
+// And then GUARANTEE the search page: startup doesn't always produce a
+// stock NTP to redirect -- a session-restore launch (which every
+// self-update restart is) reopens the previous tabs and nothing else, so
+// there was no LMB search page at the start at all. After the redirect
+// pass, if no tab is our search page, open one in the foreground.
 async function redirectStockNtp() {
   const our = chrome.runtime.getURL("newtab/newtab.html");
   for (let i = 0; i < 12; i++) {
@@ -328,6 +334,26 @@ async function redirectStockNtp() {
   }
 }
 
+async function ensureSearchPageTab() {
+  const our = chrome.runtime.getURL("newtab/newtab.html");
+  const tabs = await chrome.tabs.query({});
+  if (!tabs.some((t) => (t.url || t.pendingUrl || "").startsWith(our))) {
+    await chrome.tabs.create({ url: our, active: true }).catch(() => {});
+  }
+}
+
+// One-time profile cleanup: a v0.13 development test accidentally pinned
+// its test page (the Wikipedia "Cat" article) into a real profile's
+// webPanels. Remove exactly that URL once; a user is welcome to pin
+// Wikipedia pages themselves afterwards -- this only ever runs one time.
+async function cleanupLeakedTestPin() {
+  const { leakedPinCleaned } = await chrome.storage.local.get("leakedPinCleaned");
+  if (leakedPinCleaned) return;
+  const { webPanels = [] } = await chrome.storage.local.get("webPanels");
+  const cleaned = webPanels.filter((u) => u !== "https://en.wikipedia.org/wiki/Cat");
+  await chrome.storage.local.set({ webPanels: cleaned, leakedPinCleaned: true });
+}
+
 // Belt-and-suspenders: also catch a stock NTP that commits late.
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   const u = info.url || "";
@@ -342,7 +368,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
   checkForUpdate();
   await applyShieldState();
+  await cleanupLeakedTestPin();
   await redirectStockNtp();
+  await ensureSearchPageTab();
 });
 
 // onInstalled only fires on first load / version bump, not every browser
@@ -350,7 +378,9 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(async () => {
   checkForUpdate();
   await applyShieldState();
+  await cleanupLeakedTestPin();
   await redirectStockNtp();
+  await ensureSearchPageTab();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

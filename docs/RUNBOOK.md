@@ -644,6 +644,34 @@
   Always: `HOME=/tmp/<qa-dir> DISPLAY=:99 <appimage>` so profile, native
   host registration, Downloads, everything stays sandboxed.
 
+- **v0.17: guaranteed search page at startup, leaked-pin auto-cleanup,
+  expander discoverability** (2026-08-18). All three of the user's
+  follow-up complaints, verified on the built AppImage in an isolated env.
+  - *Search page at startup.* The stock-NTP redirect only helps when
+    startup PRODUCES an NTP -- a session-restore launch (which every
+    self-update restart is, and any "Restore pages?" launch) reopens the
+    previous tabs and nothing else, so there was no LMB search page at
+    the start. New ensureSearchPageTab() runs after the redirect pass on
+    onStartup/onInstalled: if no tab is newtab/newtab.html, open one in
+    the foreground. Verified: quit with example.com open, relaunch ->
+    both example.com (restored) AND the LMB search page are present.
+  - *Leaked-pin cleanup.* cleanupLeakedTestPin() removes exactly
+    "https://en.wikipedia.org/wiki/Cat" from webPanels once (guarded by
+    leakedPinCleaned flag) -- the URL a v0.13 dev test leaked into the
+    user's real profile. Verified: seeded the leaked state, relaunched,
+    webPanels came back empty. Right-click -> Remove also exists but the
+    user shouldn't have to clean up our mess.
+  - *Expander discoverability.* The user couldn't find the feature. The
+    Snippets panel now has a heading ("Snippets & text expander"), an
+    explainer with the 12# -> phone number example, and concrete
+    placeholders. List rows show "12# → Phone". Verified the user's exact
+    flow end-to-end WITH the real UI: created the snippet by clicking and
+    typing in the panel, then typed "Call me on 12# thanks" in a webpage
+    textarea -> "Call me on 07700 900123 thanks".
+  - NOTE: content scripts (expander included) only exist in pages loaded
+    AFTER the extension version that ships them -- tabs left open across
+    an update keep the old script until reloaded.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded
