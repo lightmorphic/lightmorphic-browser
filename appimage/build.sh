@@ -132,13 +132,20 @@ echo "==> Bundling xdotool (sidebar auto-open helper)"
 # assumed on the user's machine -- so bundle it with its one non-X lib.
 # X11-only by nature; on pure Wayland the press is a harmless no-op and
 # the shortcut still works manually.
-if command -v xdotool >/dev/null 2>&1; then
+# Vendored binaries (appimage/vendor/) are preferred: GitHub Actions' apt
+# mirrors hung two consecutive release builds, so the build must not
+# depend on installing anything. Falls back to a system xdotool if the
+# vendor dir is ever removed.
+if [ -x "$ROOT/appimage/vendor/xdotool" ]; then
+  cp "$ROOT/appimage/vendor/xdotool" "$APPDIR/usr/bin/xdotool"
+  cp "$ROOT/appimage/vendor/libxdo.so.3" "$APPDIR/usr/bin/libxdo.so.3"
+elif command -v xdotool >/dev/null 2>&1; then
   cp "$(command -v xdotool)" "$APPDIR/usr/bin/xdotool"
   for lib in $(ldd "$(command -v xdotool)" | awk '/libxdo/ {print $3}'); do
     cp "$lib" "$APPDIR/usr/bin/"
   done
 else
-  echo "==> WARNING: xdotool not installed on build machine; sidebar auto-open will be skipped" >&2
+  echo "==> WARNING: no xdotool available; sidebar auto-open will be skipped" >&2
 fi
 
 echo "==> Writing launcher"
