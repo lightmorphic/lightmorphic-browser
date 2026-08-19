@@ -539,6 +539,28 @@ async function protectOwnUi() {
   }
 }
 
+// Privacy defaults for EXISTING profiles: the Preferences seeding in
+// AppRun only runs on a genuinely fresh profile, so long-lived installs
+// never got "password manager off / autofill off". chrome.privacy can
+// set the same things at runtime. Applied ONCE (flag-guarded) so a user
+// who deliberately re-enables something isn't fought on every launch.
+async function applyPrivacyDefaults() {
+  const { privacyDefaultsApplied } = await chrome.storage.local.get("privacyDefaultsApplied");
+  if (privacyDefaultsApplied || !chrome.privacy?.services) return;
+  const set = (pref, value) =>
+    new Promise((resolve) => {
+      try {
+        pref.set({ value }, resolve);
+      } catch {
+        resolve();
+      }
+    });
+  await set(chrome.privacy.services.passwordSavingEnabled, false);
+  await set(chrome.privacy.services.autofillAddressEnabled, false);
+  await set(chrome.privacy.services.autofillCreditCardEnabled, false);
+  await chrome.storage.local.set({ privacyDefaultsApplied: true });
+}
+
 // One-time pin migration (v2): remove the Wikipedia "Cat" article a
 // v0.13 development test leaked into a real profile's webPanels, and
 // seed the LMB home page as the default pinned site (also covers fresh
@@ -604,6 +626,7 @@ async function bootTasks() {
   await step("protectOwnUi", protectOwnUi);
   await step("enforceSessionCookiePolicy", enforceSessionCookiePolicy);
   await step("applyCookieRules", applyCookieRules);
+  await step("applyPrivacyDefaults", applyPrivacyDefaults);
   await step("migratePins", migratePins);
   await step("redirectStockNtp", redirectStockNtp);
   await step("ensureSearchPageTab", ensureSearchPageTab);

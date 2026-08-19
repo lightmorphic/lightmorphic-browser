@@ -46,6 +46,7 @@
     "tabs",
     "downloads",
     "nativeMessaging",
+    "privacy",
     "declarativeNetRequestWithHostAccess",
     "clipboardRead",
     "clipboardWrite",

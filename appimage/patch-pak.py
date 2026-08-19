@@ -27,14 +27,25 @@ import sys
 from pathlib import Path
 
 REPLACEMENTS = [
-    # Targeted full-phrase Google replacements for visible menu items.
-    # Deliberately NOT a blanket "Google" -> "Lightmorphic" pass: that
-    # would manufacture nonsense/false statements ("sign in to
+    # --- Protection pass: phrases that must SURVIVE rebranding. The
+    # about-page credit must keep saying "the Chromium open source
+    # project" -- rebranding it to "the LMB open source project" made the
+    # attribution false (and the user called it out). NOTE the string in
+    # the pak contains markup: `...by the <a ...>Chromium</a> open source
+    # project...`, so the anchor-split form must be protected too. Swap
+    # to sentinels first, restore at the end.
+    (b"Chromium</a> open source project", b"@@KEEP_OSP_LINKED@@"),
+    (b"Chromium open source project", b"@@KEEP_CHROMIUM_OSP@@"),
+    # --- Targeted full-phrase Google replacements for visible menu
+    # items. Deliberately NOT a blanket "Google" -> "Lightmorphic" pass:
+    # that would manufacture nonsense/false statements ("sign in to
     # Lightmorphic sites such as Gmail") in strings that factually
     # describe Google services. Only whole phrases that name UI surfaces
     # are rewritten.
+    (b"You and Google", b"You and sync"),
     (b"Google services settings", b"Account services settings"),
     (b"Google Password Manager", b"Password Manager"),
+    (b"Google services", b"Account services"),
     # Short form "LMB" everywhere per Charlie's naming call -- these are
     # menu items and inline sentences, not explanatory surfaces.
     (b"Google Chrome", b"LMB"),
@@ -42,6 +53,9 @@ REPLACEMENTS = [
     # Bare "Chrome" appears in some strings ("Chrome preloads pages...").
     # Replace after the longer forms so it only catches leftovers.
     (b"Chrome", b"LMB"),
+    # --- Restore protected phrases.
+    (b"@@KEEP_OSP_LINKED@@", b"Chromium</a> open source project"),
+    (b"@@KEEP_CHROMIUM_OSP@@", b"Chromium open source project"),
 ]
 
 

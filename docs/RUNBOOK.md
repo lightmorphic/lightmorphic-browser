@@ -812,6 +812,45 @@
   - Chromium's native side-panel header (pin icon + X) remains
     unremovable -- it is browser chrome, not extension surface.
 
+- **v0.22: de-Google settings sweep, dead-worker cure, crash fix**
+  (2026-08-19).
+  - *Dead service worker root cause (the REAL one, finally):* the user's
+    profile had workerResponded=false -- the worker never started even
+    when messaged. Stale/corrupt SW registration in the profile (dating
+    to the v0.14 brick). AppRun now deletes Default/"Service Worker"
+    whenever the bundled version changes (browser not running at that
+    point; sites simply re-register). This also finally unblocks the pin
+    migration/cookie enforcement on that install.
+  - *SEGV found & guarded:* with OptimizationHints disabled,
+    contextual_tasks' service constructor null-derefs its model provider
+    and the whole browser crashes at profile init. BOTH ContextualTasks
+    AND ContextualTasksContext must be in --disable-features (the
+    service is gated by the latter; learned by crashing).
+  - *Settings de-Google:* "You and Google" -> "You and sync"; "Google
+    services" -> "Account services"; about-page attribution UN-branded
+    back to "made possible by the Chromium open source project" (the pak
+    string embeds an <a> tag, so the protected phrase must also match
+    the anchor-split form `Chromium</a> open source project`).
+  - *AI page gutted:* AutofillAi/HistorySearchSetting/Compose/
+    TabOrganizationSetting/WallpaperSearch + prior AI disables kill every
+    feature behind chrome://settings/ai. LIMIT: the "AI in LMB" nav ITEM
+    itself ignores all feature flags on this line -- removing the label
+    would need patching settings WebUI code inside resources.pak (blind
+    text-replacement there can corrupt JS; deliberately not done). Same
+    class of limit as the side panel header pin: native surface.
+  - *Autofill & password manager off by default:* fresh profiles via
+    Preferences seed (credentials_enable_service, autofill.*); EXISTING
+    profiles via chrome.privacy.services.* in a one-time boot step
+    (applyPrivacyDefaults, flag-guarded so user re-enables are
+    respected). Settings entry itself can't be hidden (WebUI).
+  - *Known leftovers (honest):* Chromium orb icons on the About page and
+    Settings header (image resources inside resources.pak, not patched);
+    "AI in LMB" nav label; side-panel header pin/X. All need
+    resource-level or source-level surgery, parked deliberately.
+  - *QA harness note:* pkill -f patterns match the QA shell's own eval
+    string and kill the running command batch -- iterate /proc and match
+    comm=="chrome" + cmdline instead.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

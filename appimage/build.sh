@@ -183,6 +183,17 @@ if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$WANT_VER" ]; then
   cp -r "$THEME_SRC" "$THEME"
   chmod -R u+w "$EXT" "$THEME"
   printf '%s' "$WANT_VER" > "$STAMP"
+  # Clear cached service-worker registrations whenever the bundled
+  # version changes. A real profile carried a stale/corrupt registration
+  # (dating back to the v0.14 broken build) that left the extension's
+  # background worker permanently dead -- extension pages ran, but the
+  # worker never started even when messaged (sidebarBootCheck:
+  # workerResponded=false), so migrations/updates/cookie enforcement all
+  # silently stopped. Chromium re-registers everything on next start;
+  # website workers simply re-register on next visit. Only done on
+  # version change, and only while the browser isn't running (AppRun
+  # runs before Chromium starts).
+  rm -rf "$USER_DATA_DIR/Default/Service Worker" 2>/dev/null || true
 fi
 LOAD_PATHS="$EXT,$THEME"
 
@@ -278,6 +289,12 @@ LOCALSTATE
     "allowed": false,
     "allowed_on_next_startup": false
   },
+  "credentials_enable_service": false,
+  "credentials_enable_autosignin": false,
+  "autofill": {
+    "profile_enabled": false,
+    "credit_card_enabled": false
+  },
   "default_search_provider_data": {
     "template_url_data": {
       "short_name": "DuckDuckGo",
@@ -332,7 +349,20 @@ fi
 #                                      extension) STILL works with this on --
 #                                      a test PDF rendered fine -- so it's
 #                                      surgical, not a blanket break.
-#   --disable-features=...            Translate (no Google Translate ping),
+#   --disable-features=...            ContextualTasks MUST stay in this
+#                                      list: with OptimizationHints off,
+#                                      its service constructor null-derefs
+#                                      the missing model provider and the
+#                                      whole browser SEGVs at profile init
+#                                      (found live; stack goes through
+#                                      ContextualTasksContextModelHandler).
+#                                      AutofillAi/HistorySearchSetting/
+#                                      Compose/TabOrganizationSetting/
+#                                      WallpaperSearch make the
+#                                      chrome://settings "AI" page vanish
+#                                      (its visibility = any AI feature
+#                                      available).
+#                                      Translate (no Google Translate ping),
 #                                      OptimizationHints, AutofillServerCommunication,
 #                                      and (as of the 151.x line) AiMode/LensOverlay/
 #                                      Glic/ComposeUI/HistoryEmbeddings -- the
@@ -406,7 +436,7 @@ exec "$HERE/usr/bin/chromium/chrome" \
   --disable-domain-reliability \
   --disable-client-side-phishing-detection \
   --disable-component-extensions-with-background-pages \
-  --disable-features=Translate,OptimizationHints,AutofillServerCommunication,AiMode,LensOverlay,LensStandalone,ComposeUI,LinkedServicesSetting,PageContentAnnotations,GeminiInChromeSidePanel,GlicIntegration,Glic,TabOrganization,HistoryEmbeddings \
+  --disable-features=Translate,OptimizationHints,AutofillServerCommunication,AiMode,LensOverlay,LensStandalone,ComposeUI,Compose,LinkedServicesSetting,PageContentAnnotations,GeminiInChromeSidePanel,GlicIntegration,Glic,TabOrganization,TabOrganizationSetting,HistoryEmbeddings,HistorySearchSetting,AutofillAi,WallpaperSearch,ContextualTasks \
   --disable-search-engine-choice-screen \
   --apps-gallery-url="https://webstore-proxy.lightmorphic.co.uk/webstore" \
   --apps-gallery-update-url="https://webstore-proxy.lightmorphic.co.uk/service/update2/crx" \
