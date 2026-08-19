@@ -190,8 +190,11 @@
   <dialog id="siteDialog">
     <form id="siteForm" method="dialog">
       <h2 id="siteDialogTitle">Pin this page</h2>
+      <!-- type=text, NOT type=url: url inputs reject "bbc.com" outright,
+           forcing the user to type https:// by hand. We normalise instead
+           (https:// is prepended automatically on save). -->
       <label>Address
-        <input id="siteUrl" type="url" placeholder="https://..." required autocomplete="off">
+        <input id="siteUrl" type="text" placeholder="e.g. bbc.com" required autocomplete="off" spellcheck="false">
       </label>
       <div class="dialog-actions">
         <button type="button" id="siteCancel" class="btn-secondary">Cancel</button>

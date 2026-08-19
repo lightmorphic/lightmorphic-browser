@@ -7,6 +7,18 @@ import { pull, push, isConfigured, setupSync } from "../sync/syncClient.js";
 // doesn't fire for --load-extension extensions.
 chrome.runtime.sendMessage({ type: "lightmorphic-boot" }).catch(() => {});
 
+// Health probe: a few seconds after the ping, check whether the worker
+// actually produced a fresh boot report. Written to storage so a
+// misbehaving install carries its own evidence (the worker being dead
+// explains every "my setting didn't stick" class of bug at once).
+setTimeout(async () => {
+  const { lastBootReport } = await chrome.storage.local.get("lastBootReport");
+  const fresh = lastBootReport?.at && Date.now() - Date.parse(lastBootReport.at) < 5 * 60 * 1000;
+  await chrome.storage.local.set({
+    sidebarBootCheck: { at: new Date().toISOString(), workerResponded: !!fresh },
+  });
+}, 5000);
+
 // ---- Icon rail ----
 // Only tab buttons (data-panel) switch views. The "+" button and the
 // pinned-site favicons are .rail-btn too but have their own handlers --
@@ -194,8 +206,10 @@ async function renderShieldSite() {
     const remove = document.createElement("button");
     remove.textContent = "×";
     remove.title = "Re-enable Shield on this site";
-    remove.addEventListener("click", () => {
-      chrome.runtime.sendMessage({ type: "lightmorphic-shield-site", host: h, paused: false });
+    remove.addEventListener("click", async () => {
+      const { shieldSiteExceptions: cur = [] } = await chrome.storage.local.get("shieldSiteExceptions");
+      await chrome.storage.local.set({ shieldSiteExceptions: cur.filter((x) => x !== h) });
+      askWorkerToApply();
     });
     item.append(label, remove);
     shieldExceptionList.appendChild(item);
@@ -212,17 +226,32 @@ async function loadShield() {
 }
 loadShield();
 
-shieldLevels.addEventListener("change", (e) => {
+// SETTINGS ARE SAVED HERE, IN THE SIDEBAR -- not in the worker. A user's
+// choice must persist even if the background worker is dead or slow (a
+// real install lost a per-site cookie rule exactly that way). The worker
+// is only asked to ENFORCE what storage says, and boot re-applies it all
+// anyway.
+function askWorkerToApply() {
+  chrome.runtime.sendMessage({ type: "lightmorphic-apply-settings" }).catch(() => {});
+}
+
+shieldLevels.addEventListener("change", async (e) => {
   const level = e.target?.value;
   if (!level) return;
   renderShieldLevel(level);
-  chrome.runtime.sendMessage({ type: "lightmorphic-shield-level", level });
+  await chrome.storage.local.set({ shieldLevel: level });
+  askWorkerToApply();
 });
 
 shieldSitePause.addEventListener("change", async () => {
   const host = await currentSiteHost();
   if (!host) return;
-  chrome.runtime.sendMessage({ type: "lightmorphic-shield-site", host, paused: shieldSitePause.checked });
+  const { shieldSiteExceptions = [] } = await chrome.storage.local.get("shieldSiteExceptions");
+  const next = shieldSitePause.checked
+    ? [...new Set([...shieldSiteExceptions, host])]
+    : shieldSiteExceptions.filter((h) => h !== host);
+  await chrome.storage.local.set({ shieldSiteExceptions: next });
+  askWorkerToApply();
 });
 
 // ---- Cookies ----
@@ -250,8 +279,11 @@ async function renderCookieControls() {
     const remove = document.createElement("button");
     remove.textContent = "×";
     remove.title = "Remove this rule (back to the Everywhere setting)";
-    remove.addEventListener("click", () => {
-      chrome.runtime.sendMessage({ type: "lightmorphic-cookies-site", host: h, setting: "default" });
+    remove.addEventListener("click", async () => {
+      const { cookieSiteRules: cur = {} } = await chrome.storage.local.get("cookieSiteRules");
+      delete cur[h];
+      await chrome.storage.local.set({ cookieSiteRules: cur });
+      askWorkerToApply();
     });
     item.append(label, remove);
     cookieRuleList.appendChild(item);
@@ -265,14 +297,19 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-cookieGlobal.addEventListener("change", () => {
-  chrome.runtime.sendMessage({ type: "lightmorphic-cookies-global", setting: cookieGlobal.value });
+cookieGlobal.addEventListener("change", async () => {
+  await chrome.storage.local.set({ cookieGlobalSetting: cookieGlobal.value });
+  askWorkerToApply();
 });
 
 cookieSite.addEventListener("change", async () => {
   const host = await currentSiteHost();
   if (!host) return;
-  chrome.runtime.sendMessage({ type: "lightmorphic-cookies-site", host, setting: cookieSite.value });
+  const { cookieSiteRules: cur = {} } = await chrome.storage.local.get("cookieSiteRules");
+  if (cookieSite.value === "default") delete cur[host];
+  else cur[host] = cookieSite.value;
+  await chrome.storage.local.set({ cookieSiteRules: cur });
+  askWorkerToApply();
 });
 
 chrome.tabs.onActivated.addListener(() => renderCookieControls());

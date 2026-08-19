@@ -578,25 +578,48 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 // exactly once per launch (session storage dies with the browser).
 // Alarm creation lives here too: alarms don't reliably survive for
 // unpacked extensions, so re-create them every launch (idempotent).
+// Every step runs in its own guard: one failing API must never kill the
+// steps after it (a real profile lost three releases' worth of fixes
+// because one unguarded await rejected and silently aborted the rest).
+// The per-step outcomes are written to storage as lastBootReport, so a
+// misbehaving install can be diagnosed from its profile instead of
+// guessed at.
 async function bootTasks() {
   const { bootDone } = await chrome.storage.session.get("bootDone");
   if (bootDone) return;
   await chrome.storage.session.set({ bootDone: true });
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
-  checkForUpdate();
-  await applyShieldState();
-  await protectOwnUi();
-  await enforceSessionCookiePolicy();
-  await applyCookieRules();
-  await migratePins();
-  await redirectStockNtp();
-  await ensureSearchPageTab();
+  const report = { at: new Date().toISOString(), steps: {} };
+  const step = async (name, fn) => {
+    try {
+      await fn();
+      report.steps[name] = "ok";
+    } catch (e) {
+      report.steps[name] = `ERROR: ${e?.message || e}`;
+    }
+  };
+  await step("checkForUpdate", () => checkForUpdate());
+  await step("applyShieldState", applyShieldState);
+  await step("protectOwnUi", protectOwnUi);
+  await step("enforceSessionCookiePolicy", enforceSessionCookiePolicy);
+  await step("applyCookieRules", applyCookieRules);
+  await step("migratePins", migratePins);
+  await step("redirectStockNtp", redirectStockNtp);
+  await step("ensureSearchPageTab", ensureSearchPageTab);
+  await chrome.storage.local.set({ lastBootReport: report });
 }
 bootTasks();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "lightmorphic-boot") bootTasks();
+  // The sidebar saves settings to storage itself and just asks us to
+  // enforce whatever storage now says (shield level, site pauses, cookie
+  // rules). Persistence never depends on this worker being healthy.
+  if (message?.type === "lightmorphic-apply-settings") {
+    applyShieldState().catch(() => {});
+    applyCookieRules().catch(() => {});
+  }
   return false;
 });
 

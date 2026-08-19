@@ -778,6 +778,40 @@
     remove), so "block on bbc.com, allow on fastmail.com" is visible and
     manageable in one place.
 
+- **v0.21: settings persist independently of the worker, per-step boot
+  report, no-https pinning, self-refreshing icons** (2026-08-19).
+  - *Why the user's per-site cookie rule "reset":* every setting write
+    went through the background worker (sendMessage -> setCookieSite ->
+    storage), so a dead/slow worker silently dropped the choice. Now the
+    SIDEBAR writes all settings (shieldLevel, shieldSiteExceptions,
+    cookieGlobalSetting, cookieSiteRules) directly to storage and just
+    pings "lightmorphic-apply-settings" for enforcement. Persistence can
+    no longer depend on worker health; boot re-applies everything anyway.
+  - *Per-step boot isolation + lastBootReport:* one unguarded await in
+    bootTasks (applyCookieRules had no try/catch) could abort every step
+    after it -- the likely reason the pin migration kept not running on
+    the real install while the updater (a different code path) worked.
+    Every step now runs guarded and its outcome lands in
+    storage.lastBootReport; the sidebar writes sidebarBootCheck
+    {workerResponded} 5s after its boot ping. A misbehaving install now
+    carries its own diagnosis.
+  - *Verified end-to-end on an existing profile:* seeded the user's exact
+    state (Cat+bbc pins, a bbc.com session_only cookie rule, no flags),
+    relaunched, read back: cookie rule intact, all 8 boot steps "ok",
+    webPanels = [browser.lightmorphic.co.uk, bbc.com], workerResponded
+    true.
+  - *Pin dialog accepts bare domains:* the input was type=url, which
+    makes the browser itself reject "bbc.com" before our normaliser
+    (which always prepended https://) ever ran. Now type=text.
+  - *Desktop icon:* the rebrand never reached the user's menu because
+    integration tools cache an extracted icon (~/.AppImages/.icons/<name>,
+    referenced by the .desktop Icon= line) and the hicolor copy is only
+    ever written at integration time. AppRun now refreshes both caches on
+    every launch (+ gtk-update-icon-cache). The user's cached file was
+    also fixed in place directly.
+  - Chromium's native side-panel header (pin icon + X) remains
+    unremovable -- it is browser chrome, not extension surface.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

@@ -350,6 +350,22 @@ fi
 #                                      skips the upstream search-engine
 #                                      prompt (cosmetic, not itself a privacy
 #                                      fix)
+# --- Keep desktop icons fresh ---
+# The logo changed once (navy->yellow) and every icon cache on the user's
+# machine kept showing the old one: the hicolor theme copy AND the
+# .AppImages/.icons/ file that desktop-integration tools extract once and
+# reference from the .desktop's Icon= line. Refresh both on every launch
+# so a rebranded release actually looks rebranded.
+for s in 16 32 48 64 128 256; do
+  src="$HERE/usr/share/icons/hicolor/${s}x${s}/apps/lightmorphic-browser.png"
+  dst="$HOME/.local/share/icons/hicolor/${s}x${s}/apps/lightmorphic-browser.png"
+  [ -f "$src" ] && { mkdir -p "$(dirname "$dst")"; cp -f "$src" "$dst"; }
+done
+gtk-update-icon-cache -f "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+for f in "$HOME/.AppImages/.icons/"*lightmorphic_browser*; do
+  [ -f "$f" ] && cp -f "$HERE/usr/share/icons/hicolor/256x256/apps/lightmorphic-browser.png" "$f" 2>/dev/null
+done
+
 # --- Sidebar auto-open ---
 # The sidebar should be OPEN when the browser starts, not need a click
 # every session. Chromium's sidePanel API hard-requires a user gesture
