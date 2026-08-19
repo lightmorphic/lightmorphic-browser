@@ -1,5 +1,12 @@
 import { pull, push, isConfigured, setupSync } from "../sync/syncClient.js";
 
+// Wake the background worker and have it run its once-per-launch boot
+// work. This page reliably exists at every launch (the panel auto-opens),
+// which makes it the dependable boot trigger -- the worker itself is NOT
+// started by Chromium at launch on existing profiles, and onStartup
+// doesn't fire for --load-extension extensions.
+chrome.runtime.sendMessage({ type: "lightmorphic-boot" }).catch(() => {});
+
 // ---- Icon rail ----
 // Only tab buttons (data-panel) switch views. The "+" button and the
 // pinned-site favicons are .rail-btn too but have their own handlers --
@@ -222,6 +229,9 @@ shieldSitePause.addEventListener("change", async () => {
 const cookieGlobal = document.getElementById("cookieGlobal");
 const cookieSite = document.getElementById("cookieSite");
 
+const COOKIE_MODE_LABELS = { allow: "Allow", session_only: "This session only", block: "Block" };
+const cookieRuleList = document.getElementById("cookieRuleList");
+
 async function renderCookieControls() {
   const { cookieGlobalSetting = "allow", cookieSiteRules = {} } =
     await chrome.storage.local.get(["cookieGlobalSetting", "cookieSiteRules"]);
@@ -229,8 +239,31 @@ async function renderCookieControls() {
   const host = await currentSiteHost();
   cookieSite.disabled = !host;
   cookieSite.value = (host && cookieSiteRules[host]) || "default";
+
+  // Every per-site rule, visible and removable in one place.
+  cookieRuleList.innerHTML = "";
+  for (const [h, setting] of Object.entries(cookieSiteRules)) {
+    const item = document.createElement("div");
+    item.className = "panel-item";
+    const label = document.createElement("span");
+    label.textContent = `${h} — ${COOKIE_MODE_LABELS[setting] ?? setting}`;
+    const remove = document.createElement("button");
+    remove.textContent = "×";
+    remove.title = "Remove this rule (back to the Everywhere setting)";
+    remove.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "lightmorphic-cookies-site", host: h, setting: "default" });
+    });
+    item.append(label, remove);
+    cookieRuleList.appendChild(item);
+  }
 }
 renderCookieControls();
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && (changes.cookieSiteRules || changes.cookieGlobalSetting)) {
+    renderCookieControls();
+  }
+});
 
 cookieGlobal.addEventListener("change", () => {
   chrome.runtime.sendMessage({ type: "lightmorphic-cookies-global", setting: cookieGlobal.value });
@@ -473,6 +506,8 @@ siteMenu.addEventListener("click", async (e) => {
 document.addEventListener("click", hideSiteMenu);
 window.addEventListener("blur", hideSiteMenu);
 
+let dragSiteUrl = null;
+
 function renderRailSites(webPanels) {
   railSites.innerHTML = "";
   for (const url of webPanels) {
@@ -486,6 +521,36 @@ function renderRailSites(webPanels) {
     btn.className = "rail-btn";
     btn.dataset.url = url;
     btn.title = host;
+    // Drag-and-drop reordering; the saved webPanels order is the rail
+    // order, so dropping persists the arrangement.
+    btn.draggable = true;
+    btn.addEventListener("dragstart", (e) => {
+      dragSiteUrl = url;
+      e.dataTransfer.effectAllowed = "move";
+    });
+    btn.addEventListener("dragover", (e) => {
+      if (!dragSiteUrl || dragSiteUrl === url) return;
+      e.preventDefault();
+      btn.classList.add("drop-target");
+    });
+    btn.addEventListener("dragleave", () => btn.classList.remove("drop-target"));
+    btn.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      btn.classList.remove("drop-target");
+      const from = dragSiteUrl;
+      dragSiteUrl = null;
+      if (!from || from === url) return;
+      const list = await getWebPanels();
+      const fromIdx = list.indexOf(from);
+      const toIdx = list.indexOf(url);
+      if (fromIdx < 0 || toIdx < 0) return;
+      list.splice(toIdx, 0, ...list.splice(fromIdx, 1));
+      await setWebPanels(list);
+    });
+    btn.addEventListener("dragend", () => {
+      dragSiteUrl = null;
+      railSites.querySelectorAll(".drop-target").forEach((b) => b.classList.remove("drop-target"));
+    });
     const img = document.createElement("img");
     img.className = "rail-site-icon";
     img.src = `https://icons.duckduckgo.com/ip3/${host}.ico`;
@@ -517,12 +582,36 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-// Minimise: collapse the whole panel. Chromium gives extensions no way
-// to shrink the panel to rail-width, so minimise = close; the toolbar
-// icon or Ctrl+Shift+L reopens it (and it auto-opens on every launch).
-document.getElementById("railMinimize").addEventListener("click", () => {
-  window.close();
+// Minimise: collapse to the icon rail only -- the vertical menu stays,
+// the content column hides, and clicking ANY rail icon (or the chevron
+// again) expands it back. (Chromium fixes the panel's width, so the
+// collapsed state can't physically narrow the panel itself; the content
+// area is simply blank until reopened.)
+const shellEl = document.querySelector(".shell");
+const railMinimize = document.getElementById("railMinimize");
+
+function setCollapsed(collapsed) {
+  shellEl.classList.toggle("collapsed", collapsed);
+  railMinimize.classList.toggle("flipped", collapsed);
+  railMinimize.dataset.tip = collapsed ? "Expand sidebar" : "Minimise sidebar";
+}
+
+railMinimize.addEventListener("click", () => {
+  setCollapsed(!shellEl.classList.contains("collapsed"));
 });
+
+// Any click on a rail tab, pinned favicon, or the "+" while collapsed
+// expands the sidebar again (capture phase so it runs before the
+// button's own handler switches views).
+document.querySelector(".rail").addEventListener(
+  "click",
+  (e) => {
+    if (!shellEl.classList.contains("collapsed")) return;
+    if (e.target.closest("#railMinimize")) return; // chevron handles itself
+    if (e.target.closest(".rail-btn")) setCollapsed(false);
+  },
+  true
+);
 
 railAddSite.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

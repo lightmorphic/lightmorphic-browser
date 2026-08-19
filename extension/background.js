@@ -539,16 +539,20 @@ async function protectOwnUi() {
   }
 }
 
-// One-time profile cleanup: a v0.13 development test accidentally pinned
-// its test page (the Wikipedia "Cat" article) into a real profile's
-// webPanels. Remove exactly that URL once; a user is welcome to pin
-// Wikipedia pages themselves afterwards -- this only ever runs one time.
-async function cleanupLeakedTestPin() {
-  const { leakedPinCleaned } = await chrome.storage.local.get("leakedPinCleaned");
-  if (leakedPinCleaned) return;
+// One-time pin migration (v2): remove the Wikipedia "Cat" article a
+// v0.13 development test leaked into a real profile's webPanels, and
+// seed the LMB home page as the default pinned site (also covers fresh
+// profiles, whose webPanels start empty). Runs once per profile; the
+// user can of course remove/re-add anything afterwards.
+const DEFAULT_PIN = "https://browser.lightmorphic.co.uk";
+
+async function migratePins() {
+  const { pinMigration2 } = await chrome.storage.local.get("pinMigration2");
+  if (pinMigration2) return;
   const { webPanels = [] } = await chrome.storage.local.get("webPanels");
   const cleaned = webPanels.filter((u) => u !== "https://en.wikipedia.org/wiki/Cat");
-  await chrome.storage.local.set({ webPanels: cleaned, leakedPinCleaned: true });
+  if (!cleaned.includes(DEFAULT_PIN)) cleaned.unshift(DEFAULT_PIN);
+  await chrome.storage.local.set({ webPanels: cleaned, pinMigration2: true });
 }
 
 // Belt-and-suspenders: also catch a stock NTP that commits late.
@@ -560,36 +564,44 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 });
 
 // ---- Boot ----
-// These must run once per BROWSER LAUNCH. chrome.runtime.onStartup is not
-// a reliable carrier for that with --load-extension extensions --
-// verified on a real install: the sidebar showed the new version, the
-// update alarm ran, yet none of the onStartup work (profile cleanup,
-// search-page guarantee, shield re-apply) had executed. So boot work runs
-// from the service worker's TOP LEVEL, which executes every time the
-// worker starts, guarded by a chrome.storage.session flag: session
-// storage survives worker restarts within a browser session but is
-// wiped when the browser exits -- exactly "once per launch". onStartup /
-// onInstalled still call it (first-eval overlap is absorbed by the same
-// guard, and calling bootTasks keeps them harmless where they DO fire).
+// These must run once per BROWSER LAUNCH. Getting a guaranteed carrier
+// for that took three attempts, each disproved on a REAL install:
+//   1. onStartup -- provably doesn't fire for --load-extension exts.
+//   2. SW top-level evaluation -- on an EXISTING profile Chromium doesn't
+//      even start the service worker at launch (it waits for an event);
+//      fresh QA profiles hid this because onInstalled fires there, and
+//      CDP inspection itself wakes workers, masking it during testing.
+//   3. Current design: the sidebar and new-tab pages -- which DO reliably
+//      exist at every launch (auto-open + guaranteed search tab) -- send
+//      a "lightmorphic-boot" ping; message delivery starts the worker.
+// The storage.session guard collapses however many triggers fire into
+// exactly once per launch (session storage dies with the browser).
+// Alarm creation lives here too: alarms don't reliably survive for
+// unpacked extensions, so re-create them every launch (idempotent).
 async function bootTasks() {
   const { bootDone } = await chrome.storage.session.get("bootDone");
   if (bootDone) return;
   await chrome.storage.session.set({ bootDone: true });
+  chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
+  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
   checkForUpdate();
   await applyShieldState();
   await protectOwnUi();
   await enforceSessionCookiePolicy();
   await applyCookieRules();
-  await cleanupLeakedTestPin();
+  await migratePins();
   await redirectStockNtp();
   await ensureSearchPageTab();
 }
 bootTasks();
 
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "lightmorphic-boot") bootTasks();
+  return false;
+});
+
 chrome.runtime.onInstalled.addListener(async () => {
   await rebuildQuickPasteMenu();
-  chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
-  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
   await bootTasks();
 });
 

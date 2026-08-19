@@ -744,6 +744,40 @@
   - CI note: the "Install xdotool" apt step once hung 25+ min on a bad
     mirror; step now has timeout-minutes: 5 + Acquire::Retries.
 
+- **v0.20: boot that finally fires on real profiles, collapse-to-rail,
+  default LMB pin, drag-reorder, per-site cookie list** (2026-08-19).
+  - *THE boot lesson (third attempt, now proven):* on an EXISTING profile
+    Chromium does not start the MV3 service worker at browser launch at
+    all -- it waits for an event. Fresh QA profiles masked this
+    (onInstalled fires there) and CDP INSPECTION ITSELF WAKES WORKERS, so
+    every instrumented test lied. v0.18/0.19's "reliable" top-level boot
+    therefore never ran on the user's machine (Wikipedia pin survived
+    three releases). Fix: the sidebar and new-tab pages -- which
+    demonstrably exist at every launch -- send "lightmorphic-boot"; the
+    message starts the worker, whose bootTasks() (session-guarded) does
+    everything. Alarms are also re-created there (they don't survive for
+    unpacked extensions). VERIFIED THE HONEST WAY: existing profile,
+    second launch, ZERO debugger contact, quit, then read the LevelDB --
+    migration flag + rewritten webPanels present.
+  - *QA rule going forward:* proving background work ran = launch with NO
+    remote-debugging contact, quit, inspect storage files. Any CDP query
+    can wake the worker and fake a pass.
+  - *Pin migration v2:* Wikipedia test pin removed AND
+    https://browser.lightmorphic.co.uk seeded as the default pinned site
+    (also on fresh profiles). NOTE: that subdomain has no DNS yet (curl
+    000) -- the pin shows a plain dot favicon and an error page in the
+    panel until the site goes live.
+  - *Minimise reworked* per feedback: collapses to the ICON RAIL (content
+    hidden, chevron flips, tooltip "Expand sidebar"); clicking any rail
+    icon expands again. True panel-width shrink stays impossible
+    (Chromium fixes side-panel width; extensions have no width API).
+  - *Drag-and-drop reordering* of pinned-site favicons (HTML5 DnD inside
+    #railSites; saved webPanels order IS the rail order). Verified with a
+    real press-move-release drag: order flipped and persisted.
+  - *Per-site cookie rules list* in the Shield panel (host -> mode with
+    remove), so "block on bbc.com, allow on fastmail.com" is visible and
+    manageable in one place.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

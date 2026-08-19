@@ -1,6 +1,11 @@
 // New tab page: DuckDuckGo search. (The update widget lives only in the
 // sidebar footer now -- a replaceable page is the wrong home for it.)
 
+// Second boot trigger alongside the sidebar (see background.js bootTasks
+// comment): the worker isn't started at launch on existing profiles, so
+// whichever of our pages appears first wakes it to run its boot work.
+chrome.runtime.sendMessage({ type: "lightmorphic-boot" }).catch(() => {});
+
 const searchForm = document.getElementById("searchForm");
 const searchBox = document.getElementById("searchBox");
 
