@@ -340,6 +340,82 @@ async function setSitePaused(host, paused) {
   await applySiteExceptions();
 }
 
+// ---- Cookies ----
+// Enforced by Chromium's own content-settings engine (the same machinery
+// behind chrome://settings/content/cookies), which persists rules in the
+// profile natively. Three modes, global and per-site:
+//   allow | session_only (accepted, wiped when the browser closes) | block
+// Our storage (cookieGlobalSetting + cookieSiteRules) is the source of
+// truth for the UI; applyCookieRules() clears our previously-set rules
+// and re-applies the whole set, so removing a per-site override is just
+// dropping it from the map. Re-run at boot for consistency (idempotent).
+async function applyCookieRules() {
+  if (!chrome.contentSettings?.cookies) return;
+  const { cookieGlobalSetting = "allow", cookieSiteRules = {} } =
+    await chrome.storage.local.get(["cookieGlobalSetting", "cookieSiteRules"]);
+  const cookies = chrome.contentSettings.cookies;
+  await new Promise((r) => cookies.clear({}, r));
+  if (cookieGlobalSetting !== "allow") {
+    await new Promise((r) =>
+      cookies.set({ primaryPattern: "<all_urls>", setting: cookieGlobalSetting }, r)
+    );
+  }
+  for (const [host, setting] of Object.entries(cookieSiteRules)) {
+    for (const scheme of ["http", "https"]) {
+      await new Promise((r) =>
+        cookies.set({ primaryPattern: `${scheme}://[*.]${host}/*`, setting }, r)
+      );
+    }
+  }
+}
+
+// "This session only" must mean it: cookies added during a session are
+// gone by the next one. Chromium's session_only content setting deletes
+// them on a CLEAN exit, but after a crash/kill it deliberately keeps
+// session cookies for recovery (verified live: a killed session's cookie
+// survived into the next launch). This boot-time sweep closes that gap:
+// under a session-only policy, wipe cookies at the start of each session
+// -- keeping cookies for sites the user explicitly set to "allow".
+async function enforceSessionCookiePolicy() {
+  if (!chrome.browsingData) return;
+  const { cookieGlobalSetting = "allow", cookieSiteRules = {} } =
+    await chrome.storage.local.get(["cookieGlobalSetting", "cookieSiteRules"]);
+  const originsFor = (host) => [`https://${host}`, `http://${host}`];
+  try {
+    if (cookieGlobalSetting === "session_only") {
+      const keep = Object.entries(cookieSiteRules)
+        .filter(([, s]) => s === "allow")
+        .flatMap(([h]) => originsFor(h));
+      await chrome.browsingData.remove({ excludeOrigins: keep }, { cookies: true });
+    } else {
+      const wipe = Object.entries(cookieSiteRules)
+        .filter(([, s]) => s === "session_only")
+        .flatMap(([h]) => originsFor(h));
+      if (wipe.length) {
+        await chrome.browsingData.remove({ origins: wipe }, { cookies: true });
+      }
+    }
+  } catch {
+    /* browsingData unavailable -- Chromium's own clean-exit path still applies */
+  }
+}
+
+async function setCookieGlobal(setting) {
+  if (!["allow", "session_only", "block"].includes(setting)) return;
+  await chrome.storage.local.set({ cookieGlobalSetting: setting });
+  await applyCookieRules();
+}
+
+async function setCookieSite(host, setting) {
+  if (!host) return;
+  const { cookieSiteRules = {} } = await chrome.storage.local.get("cookieSiteRules");
+  if (setting === "default") delete cookieSiteRules[host];
+  else if (["allow", "session_only", "block"].includes(setting)) cookieSiteRules[host] = setting;
+  else return;
+  await chrome.storage.local.set({ cookieSiteRules });
+  await applyCookieRules();
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "lightmorphic-shield-level") {
     setShieldLevel(message.level).then(() => sendResponse({ ok: true }));
@@ -347,6 +423,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message?.type === "lightmorphic-shield-site") {
     setSitePaused(message.host, !!message.paused).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (message?.type === "lightmorphic-cookies-global") {
+    setCookieGlobal(message.setting).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (message?.type === "lightmorphic-cookies-site") {
+    setCookieSite(message.host, message.setting).then(() => sendResponse({ ok: true }));
     return true;
   }
   return false;
@@ -494,6 +578,8 @@ async function bootTasks() {
   checkForUpdate();
   await applyShieldState();
   await protectOwnUi();
+  await enforceSessionCookiePolicy();
+  await applyCookieRules();
   await cleanupLeakedTestPin();
   await redirectStockNtp();
   await ensureSearchPageTab();

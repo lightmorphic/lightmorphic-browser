@@ -218,6 +218,33 @@ shieldSitePause.addEventListener("change", async () => {
   chrome.runtime.sendMessage({ type: "lightmorphic-shield-site", host, paused: shieldSitePause.checked });
 });
 
+// ---- Cookies ----
+const cookieGlobal = document.getElementById("cookieGlobal");
+const cookieSite = document.getElementById("cookieSite");
+
+async function renderCookieControls() {
+  const { cookieGlobalSetting = "allow", cookieSiteRules = {} } =
+    await chrome.storage.local.get(["cookieGlobalSetting", "cookieSiteRules"]);
+  cookieGlobal.value = cookieGlobalSetting;
+  const host = await currentSiteHost();
+  cookieSite.disabled = !host;
+  cookieSite.value = (host && cookieSiteRules[host]) || "default";
+}
+renderCookieControls();
+
+cookieGlobal.addEventListener("change", () => {
+  chrome.runtime.sendMessage({ type: "lightmorphic-cookies-global", setting: cookieGlobal.value });
+});
+
+cookieSite.addEventListener("change", async () => {
+  const host = await currentSiteHost();
+  if (!host) return;
+  chrome.runtime.sendMessage({ type: "lightmorphic-cookies-site", host, setting: cookieSite.value });
+});
+
+chrome.tabs.onActivated.addListener(() => renderCookieControls());
+chrome.tabs.onUpdated.addListener((id, info) => { if (info.url || info.status === "complete") renderCookieControls(); });
+
 // Keep "This site" current as the user moves between tabs/pages, and the
 // exception list live when the worker updates it.
 chrome.tabs.onActivated.addListener(() => renderShieldSite());

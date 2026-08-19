@@ -41,7 +41,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install xdotool (bundled for sidebar auto-open)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xdotool
+        # timeout-minutes: a hung apt mirror once pinned this step (and the
+        # whole build) for 25+ minutes; better to fail fast and retry.
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update -qq -o Acquire::Retries=3 || true
+          sudo apt-get install -y -qq xdotool
       - name: Fetch FUSE3-compatible appimagetool
         run: |
           # Asset filenames embed a build number that changes (e.g.

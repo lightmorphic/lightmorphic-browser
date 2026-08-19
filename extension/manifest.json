@@ -37,6 +37,8 @@
   },
   "permissions": [
     "sidePanel",
+    "browsingData",
+    "contentSettings",
     "contextMenus",
     "storage",
     "alarms",

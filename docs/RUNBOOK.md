@@ -721,6 +721,29 @@
   - *Sidebar live-updates* webPanels via storage.onChanged (cleanup is
     visible immediately even if the sidebar loaded first).
 
+- **v0.19: cookie controls + inverted logo** (2026-08-19). Verified on the
+  built AppImage, isolated env.
+  - *Cookie controls* (user request): global policy + per-site override,
+    three modes each -- Allow / This session only / Block -- in the Shield
+    panel. Enforced by chrome.contentSettings.cookies (the same engine as
+    chrome://settings/content/cookies; persists in the profile). Our
+    storage (cookieGlobalSetting, cookieSiteRules) is the UI's source of
+    truth; applyCookieRules() clears our rules and re-applies the set.
+  - *Session-only really means it:* Chromium deletes session_only cookies
+    only on a CLEAN exit -- after a kill/crash it keeps them for recovery
+    (verified: killed session's cookie survived). enforceSessionCookiePolicy()
+    at boot sweeps cookies via chrome.browsingData under a session-only
+    policy (keeping explicit per-site "allow" sites), so the guarantee
+    holds even after unclean exits. Verified: cookie set under
+    session_only, browser SIGKILLed, relaunch -> document.cookie empty.
+    Block mode verified (cookie never sticks); policy survives restart.
+  - *Logo inverted* (user request): yellow rounded-square background,
+    navy icon lines (was navy bg / yellow icon). Done by per-pixel
+    blend-swap between the two brand colours so antialiasing survives;
+    propagated to assets/, extension/icons/, newtab/logo.png.
+  - CI note: the "Install xdotool" apt step once hung 25+ min on a bad
+    mirror; step now has timeout-minutes: 5 + Acquire::Retries.
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

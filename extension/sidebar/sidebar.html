@@ -105,11 +105,29 @@
             <span><strong>Strict</strong><small>Also cookie pop-ups &amp; floating widgets</small></span></label>
         </div>
 
+        <h2 class="settings-heading">Cookies</h2>
+        <label class="select-row">Everywhere
+          <select id="cookieGlobal">
+            <option value="allow">Allow</option>
+            <option value="session_only">This session only</option>
+            <option value="block">Block all</option>
+          </select>
+        </label>
+        <p class="hint">&ldquo;This session only&rdquo; accepts cookies so sites work, then wipes them when you close the browser.</p>
+
         <h2 class="settings-heading">This site</h2>
         <div class="status-row"><span id="shieldSiteHost" class="shield-site-host">&hellip;</span></div>
         <label class="checkbox-row">
           <input id="shieldSitePause" type="checkbox">
           Pause Shield on this site
+        </label>
+        <label class="select-row">Cookies here
+          <select id="cookieSite">
+            <option value="default">Same as everywhere</option>
+            <option value="allow">Allow</option>
+            <option value="session_only">This session only</option>
+            <option value="block">Block</option>
+          </select>
         </label>
         <p class="hint">Paused sites keep working even when a filter breaks them &mdash; everything else stays protected. Remembered until you unpause.</p>
         <div class="panel-list" id="shieldExceptionList"></div>
