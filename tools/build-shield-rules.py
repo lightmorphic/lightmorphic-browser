@@ -38,9 +38,15 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "extension" / "shield" / "rules"
 
 # Source lists. All GPLv3. Fetched from the lists' own homes, never Google.
+# The enabled flag is what the manifest ships as the ruleset's default;
+# the actual enablement is driven at runtime by the user's Shield level
+# (Off / Essential / Balanced / Strict -- see background.js):
+#   essential -> easyprivacy;  balanced -> + easylist (default);
+#   strict    -> + annoyances (cookie pop-ups, floating widgets).
 SOURCES = [
-    ("easylist",    "https://easylist.to/easylist/easylist.txt"),
-    ("easyprivacy", "https://easylist.to/easylist/easyprivacy.txt"),
+    ("easylist",    "https://easylist.to/easylist/easylist.txt",         True),
+    ("easyprivacy", "https://easylist.to/easylist/easyprivacy.txt",      True),
+    ("annoyances",  "https://easylist.to/easylist/fanboy-annoyance.txt", False),
 ]
 
 # Adblock resource-type option -> DNR resourceType.
@@ -135,7 +141,20 @@ def to_condition(pattern, bits):
     cond = {"urlFilter": urlf}
     if bits.get("resourceTypes"):
         cond["resourceTypes"] = sorted(set(bits["resourceTypes"]))
-    if bits.get("excludedResourceTypes"):
+    else:
+        # CRITICAL semantic fix: an Adblock filter with no explicit type
+        # applies to subresources only -- NEVER to the top-level page
+        # navigation (uBO requires an explicit $document option for that,
+        # calling it "strict blocking"). DNR's default is the opposite:
+        # no resourceTypes = ALL types including main_frame. Shipping the
+        # lists under DNR defaults meant a filter could block an entire
+        # page load the user asked for -- which is how the browser's own
+        # search page once rendered as "blocked by LMB". Typeless filters
+        # therefore always exclude main_frame here.
+        excl = set(bits.get("excludedResourceTypes") or [])
+        excl.add("main_frame")
+        bits["excludedResourceTypes"] = sorted(excl)
+    if bits.get("excludedResourceTypes") and "resourceTypes" not in cond:
         cond["excludedResourceTypes"] = sorted(set(bits["excludedResourceTypes"]))
     if bits.get("domainType"):
         cond["domainType"] = bits["domainType"]
@@ -203,7 +222,7 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     manifest_entries = []
     total = 0
-    for name, url in SOURCES:
+    for name, url, enabled in SOURCES:
         print(f"==> {name}: fetching {url}")
         text = fetch(url)
         rules, stats = convert(text)
@@ -216,7 +235,7 @@ def main():
               f"unsupported={stats['unsup']} bad={stats['bad']})")
         manifest_entries.append({
             "id": name,
-            "enabled": True,
+            "enabled": enabled,
             "path": f"shield/rules/{name}.json",
         })
     (OUT_DIR / "rulesets.index.json").write_text(

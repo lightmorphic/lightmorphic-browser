@@ -672,6 +672,55 @@
     AFTER the extension version that ships them -- tabs left open across
     an update keep the old script until reloaded.
 
+- **v0.18: Shield levels + per-site pause, reliable boot, zombie-tab
+  rescue, minimise** (2026-08-19). All verified on the built AppImage,
+  isolated env, across a real restart.
+  - *Root cause of "blocked by LMB" search page + Wikipedia surviving
+    v0.17:* two independent bugs. (1) chrome.runtime.onStartup does NOT
+    reliably fire for --load-extension extensions -- on the user's real
+    install the sidebar ran v0.17 and the update alarm ticked, but none
+    of the onStartup work (cleanup, search-page guarantee, shield
+    re-apply) had executed; leakedPinCleaned was absent from storage.
+    Boot work now runs from the SW's TOP LEVEL guarded by a
+    chrome.storage.session flag ("once per browser launch" exactly --
+    session storage dies with the browser). (2) The "blocked by LMB"
+    page was a ZOMBIE: testMatchOutcome proved neither v0.16's nor
+    v0.17's shipped rules match the newtab URL -- the tab was blocked
+    once by an earlier transient list snapshot and session restore kept
+    resurrecting the error page, while ensureSearchPageTab counted the
+    corpse as "present". It now RELOADS + focuses an existing search
+    tab (stateless page, reload is free) instead of trusting it.
+  - *Structural guarantees against self-blocking:* the converter now
+    gives typeless filters excludedResourceTypes:["main_frame"] -- uBO's
+    own semantics (typeless filters never block top-level navigations;
+    that needs an explicit $document). Also fixed: the old code could
+    emit resourceTypes AND excludedResourceTypes together (invalid rule)
+    for filters like $~image,script. Plus protectOwnUi(): a
+    priority-1000000 session allow rule for chrome-extension://<our-id>/
+    re-added every boot.
+  - *Shield levels* (user request): Off / Essential (EasyPrivacy) /
+    Balanced (default; + EasyList) / Strict (+ Fanboy's Annoyances --
+    cookie pop-ups; new third ruleset, 4,168 network rules, manifest
+    enabled:false, ~110k total). shieldLevel persisted; legacy
+    shieldEnabled:false migrates to "off". Verified all four map to the
+    right getEnabledRulesets sets and the level survives restart.
+  - *Per-site pause:* shieldSiteExceptions hostname list; each gets a
+    priority-900000 allowAllRequests session rule (requestDomains:[host],
+    main_frame+sub_frame) -- uBO's per-site power switch. Session rules
+    die on restart so boot re-adds them from the list; verified paused
+    example.com survives restart.
+  - *Shield UI:* own rail icon + panel (level radios, "This site" pause
+    checkbox for the active tab, exceptions list with un-pause). The old
+    buried Settings toggle is gone -- the user literally couldn't find
+    it ("we also need an interface that I can't find").
+  - *Minimise:* chevron at rail top -> window.close() collapses the
+    panel; Ctrl+Shift+L / toolbar icon / next launch reopens. TRUE
+    rail-only collapse is impossible: Chromium fixes the side panel's
+    minimum width and gives extensions no width control; the native
+    header (pin icon, X) is browser chrome and can't be altered.
+  - *Sidebar live-updates* webPanels via storage.onChanged (cleanup is
+    visible immediately even if the sidebar loaded first).
+
 ## Not yet built / verified
 
 - Zero-click toolbar pinning — still correct-but-unreliable pre-seeded

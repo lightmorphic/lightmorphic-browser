@@ -248,37 +248,106 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // ---- LMB Shield (ad / tracker blocking) ----
 // The blocking itself is done natively by Chromium's declarativeNetRequest
-// engine using static rulesets compiled from EasyList + EasyPrivacy (the
-// same lists uBlock Origin uses) -- see tools/build-shield-rules.py and
-// extension/shield/rules/. The rulesets are declared enabled:true in the
-// manifest, so protection is ON by default from first launch with zero
-// runtime cost. This code only honours the user's on/off choice: if they
-// turned Shield off, re-apply that on every startup (the manifest would
-// otherwise re-enable it).
-const SHIELD_RULESETS = ["easylist", "easyprivacy"];
+// engine using static rulesets compiled from EasyList, EasyPrivacy and
+// Fanboy's Annoyances (the same lists uBlock Origin uses) -- see
+// tools/build-shield-rules.py and extension/shield/rules/.
+//
+// Protection LEVELS (global, persisted in shieldLevel):
+//   off       -> nothing blocked
+//   essential -> trackers (EasyPrivacy)
+//   balanced  -> ads + trackers (EasyList + EasyPrivacy)  [default]
+//   strict    -> + annoyances (cookie pop-ups, floating widgets)
+// The level maps to which static rulesets are enabled; that choice is
+// re-applied on every boot so it survives restarts and the manifest's
+// defaults never fight the user.
+//
+// PER-SITE pause (shieldSiteExceptions, a list of hostnames): a
+// max-priority allowAllRequests session rule per host -- everything a
+// page on that host loads is allowed, exactly uBO's per-site power
+// switch. Session rules vanish on restart, so boot re-adds them from
+// storage; the LIST is what persists.
+const SHIELD_ALL_RULESETS = ["easylist", "easyprivacy", "annoyances"];
+const SHIELD_LEVEL_RULESETS = {
+  off: [],
+  essential: ["easyprivacy"],
+  balanced: ["easylist", "easyprivacy"],
+  strict: ["easylist", "easyprivacy", "annoyances"],
+};
+const SITE_EXCEPTION_RULE_BASE = 900000000;
 
-async function applyShieldState() {
-  const { shieldEnabled = true } = await chrome.storage.local.get("shieldEnabled");
+async function getShieldLevel() {
+  const { shieldLevel, shieldEnabled } = await chrome.storage.local.get(["shieldLevel", "shieldEnabled"]);
+  if (shieldLevel && SHIELD_LEVEL_RULESETS[shieldLevel]) return shieldLevel;
+  // Migrate the old boolean toggle: an explicit "off" is respected.
+  return shieldEnabled === false ? "off" : "balanced";
+}
+
+function siteExceptionRuleId(host) {
+  let h = 0;
+  for (let i = 0; i < host.length; i++) h = (h * 31 + host.charCodeAt(i)) & 0x7fffffff;
+  return SITE_EXCEPTION_RULE_BASE + (h % 90000000);
+}
+
+async function applySiteExceptions() {
+  const { shieldSiteExceptions = [] } = await chrome.storage.local.get("shieldSiteExceptions");
   try {
-    await chrome.declarativeNetRequest.updateEnabledRulesets(
-      shieldEnabled
-        ? { enableRulesetIds: SHIELD_RULESETS }
-        : { disableRulesetIds: SHIELD_RULESETS }
-    );
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const oldIds = existing
+      .map((r) => r.id)
+      .filter((id) => id >= SITE_EXCEPTION_RULE_BASE && id < SITE_EXCEPTION_RULE_BASE + 90000000);
+    const addRules = shieldSiteExceptions.map((host) => ({
+      id: siteExceptionRuleId(host),
+      priority: 900000,
+      action: { type: "allowAllRequests" },
+      condition: {
+        requestDomains: [host],
+        resourceTypes: ["main_frame", "sub_frame"],
+      },
+    }));
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: oldIds, addRules });
   } catch {
-    /* ruleset ids not present (e.g. rules not built) -- nothing to toggle */
+    /* DNR unavailable */
   }
 }
 
-async function setShield(enabled) {
-  await chrome.storage.local.set({ shieldEnabled: enabled });
+async function applyShieldState() {
+  const level = await getShieldLevel();
+  const want = SHIELD_LEVEL_RULESETS[level];
+  try {
+    await chrome.declarativeNetRequest.updateEnabledRulesets({
+      disableRulesetIds: SHIELD_ALL_RULESETS.filter((id) => !want.includes(id)),
+      enableRulesetIds: want,
+    });
+  } catch {
+    /* ruleset ids not present (e.g. rules not built) -- nothing to toggle */
+  }
+  await applySiteExceptions();
+}
+
+async function setShieldLevel(level) {
+  if (!SHIELD_LEVEL_RULESETS[level]) return;
+  await chrome.storage.local.set({ shieldLevel: level });
   await applyShieldState();
 }
 
+async function setSitePaused(host, paused) {
+  if (!host) return;
+  const { shieldSiteExceptions = [] } = await chrome.storage.local.get("shieldSiteExceptions");
+  const next = paused
+    ? [...new Set([...shieldSiteExceptions, host])]
+    : shieldSiteExceptions.filter((h) => h !== host);
+  await chrome.storage.local.set({ shieldSiteExceptions: next });
+  await applySiteExceptions();
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "lightmorphic-shield-set") {
-    setShield(!!message.enabled).then(() => sendResponse({ ok: true }));
+  if (message?.type === "lightmorphic-shield-level") {
+    setShieldLevel(message.level).then(() => sendResponse({ ok: true }));
     return true; // async response
+  }
+  if (message?.type === "lightmorphic-shield-site") {
+    setSitePaused(message.host, !!message.paused).then(() => sendResponse({ ok: true }));
+    return true;
   }
   return false;
 });
@@ -337,8 +406,52 @@ async function redirectStockNtp() {
 async function ensureSearchPageTab() {
   const our = chrome.runtime.getURL("newtab/newtab.html");
   const tabs = await chrome.tabs.query({});
-  if (!tabs.some((t) => (t.url || t.pendingUrl || "").startsWith(our))) {
+  const existing = tabs.find((t) => (t.url || t.pendingUrl || "").startsWith(our));
+  if (existing) {
+    // Reload, don't trust: session restore can resurrect this tab as a
+    // stale ERROR page (seen live: a transiently-blocked search page came
+    // back as "blocked by LMB" on every launch, and a bare URL check
+    // counted that corpse as "search page present"). The page is a
+    // stateless search box -- reloading is free and always heals it.
+    await chrome.tabs.reload(existing.id).catch(() => {});
+    await chrome.tabs.update(existing.id, { active: true }).catch(() => {});
+  } else {
     await chrome.tabs.create({ url: our, active: true }).catch(() => {});
+  }
+}
+
+// Our own UI must never be blockable by Shield's filter lists. The lists
+// are refetched upstream every build; a pattern could in principle match
+// our extension URLs, and a blocked main frame renders Chromium's
+// "blocked by LMB" error page instead of the browser's own search page.
+// A maximum-priority session ALLOW rule for our origin makes that
+// structurally impossible (session rules re-add on every boot, so this
+// also can't go stale). Belt and braces with the converter change that
+// keeps list rules off main_frame navigations entirely.
+const OWN_UI_ALLOW_RULE_ID = 999999901;
+
+async function protectOwnUi() {
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [OWN_UI_ALLOW_RULE_ID],
+      addRules: [
+        {
+          id: OWN_UI_ALLOW_RULE_ID,
+          priority: 1000000,
+          action: { type: "allow" },
+          condition: {
+            urlFilter: `|chrome-extension://${chrome.runtime.id}/`,
+            resourceTypes: [
+              "main_frame", "sub_frame", "stylesheet", "script", "image",
+              "font", "object", "xmlhttprequest", "ping", "media",
+              "websocket", "other",
+            ],
+          },
+        },
+      ],
+    });
+  } catch {
+    /* DNR unavailable -- nothing to protect against either */
   }
 }
 
@@ -362,26 +475,39 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
   }
 });
 
+// ---- Boot ----
+// These must run once per BROWSER LAUNCH. chrome.runtime.onStartup is not
+// a reliable carrier for that with --load-extension extensions --
+// verified on a real install: the sidebar showed the new version, the
+// update alarm ran, yet none of the onStartup work (profile cleanup,
+// search-page guarantee, shield re-apply) had executed. So boot work runs
+// from the service worker's TOP LEVEL, which executes every time the
+// worker starts, guarded by a chrome.storage.session flag: session
+// storage survives worker restarts within a browser session but is
+// wiped when the browser exits -- exactly "once per launch". onStartup /
+// onInstalled still call it (first-eval overlap is absorbed by the same
+// guard, and calling bootTasks keeps them harmless where they DO fire).
+async function bootTasks() {
+  const { bootDone } = await chrome.storage.session.get("bootDone");
+  if (bootDone) return;
+  await chrome.storage.session.set({ bootDone: true });
+  checkForUpdate();
+  await applyShieldState();
+  await protectOwnUi();
+  await cleanupLeakedTestPin();
+  await redirectStockNtp();
+  await ensureSearchPageTab();
+}
+bootTasks();
+
 chrome.runtime.onInstalled.addListener(async () => {
   await rebuildQuickPasteMenu();
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 30 });
-  checkForUpdate();
-  await applyShieldState();
-  await cleanupLeakedTestPin();
-  await redirectStockNtp();
-  await ensureSearchPageTab();
+  await bootTasks();
 });
 
-// onInstalled only fires on first load / version bump, not every browser
-// launch -- onStartup covers the normal "opened the browser today" case.
-chrome.runtime.onStartup.addListener(async () => {
-  checkForUpdate();
-  await applyShieldState();
-  await cleanupLeakedTestPin();
-  await redirectStockNtp();
-  await ensureSearchPageTab();
-});
+chrome.runtime.onStartup.addListener(bootTasks);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SYNC_ALARM) runSyncPass();

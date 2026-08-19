@@ -71,6 +71,11 @@
         "id": "easyprivacy",
         "enabled": true,
         "path": "shield/rules/easyprivacy.json"
+      },
+      {
+        "id": "annoyances",
+        "enabled": false,
+        "path": "shield/rules/annoyances.json"
       }
     ]
   }

@@ -139,6 +139,27 @@ body {
 
 .rail-spacer { flex: 1; }
 
+/* Minimise chevron: quieter than the tab icons, and pointing off the
+   right edge (where the panel collapses to). */
+.rail-btn-min { color: var(--muted-fg); }
+.rail-btn-min:hover { color: var(--fg); }
+
+/* Shield protection levels */
+.shield-levels { display: flex; flex-direction: column; gap: 0.375rem; margin-bottom: 0.75rem; }
+.shield-level {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+}
+.shield-level:has(input:checked) { border-color: var(--accent); }
+.shield-level input { margin-top: 0.2rem; accent-color: var(--accent); }
+.shield-level span { display: flex; flex-direction: column; gap: 0.125rem; }
+.shield-level small { color: var(--muted-fg); }
+.shield-site-host { font-weight: 600; word-break: break-all; }
+
 .rail-divider {
   width: 22px;
   border-top: 1px solid var(--border);

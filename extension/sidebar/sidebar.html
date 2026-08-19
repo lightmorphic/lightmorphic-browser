@@ -8,6 +8,12 @@
 <body>
   <div class="shell">
     <nav class="rail" role="tablist" aria-label="Sidebar sections">
+      <!-- Chromium's own panel header (the pin and X up top) can't be
+           altered by an extension; this is OUR minimise -- collapses the
+           whole panel, Ctrl+Shift+L or the toolbar icon brings it back. -->
+      <button class="rail-btn rail-btn-min" id="railMinimize" type="button" data-tip="Minimise &mdash; Ctrl+Shift+L reopens" aria-label="Minimise sidebar (Ctrl+Shift+L reopens)">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg>
+      </button>
       <button class="rail-btn active" data-panel="notes" role="tab" aria-selected="true" data-tip="Notes" aria-label="Notes">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h9l3 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v3h3"/><path d="M6.5 9.5h7M6.5 12.5h7M6.5 15.5h4"/></svg>
       </button>
@@ -19,6 +25,9 @@
       </button>
       <button class="rail-btn" data-panel="snippets" role="tab" aria-selected="false" data-tip="Quick paste snippets" aria-label="Quick paste snippets">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.2"/><path d="M8 3.5h4a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M7.5 9h5M7.5 12h5"/></svg>
+      </button>
+      <button class="rail-btn" data-panel="shield" role="tab" aria-selected="false" data-tip="LMB Shield" aria-label="LMB Shield — ad and tracker blocking">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 4 5v5c0 3.7 2.6 6.4 6 7.5 3.4-1.1 6-3.8 6-7.5V5l-6-2.5z"/><path d="M7.5 10l1.8 1.8 3.2-3.6"/></svg>
       </button>
       <div class="rail-divider"></div>
       <!-- Pinned sites render here as favicon buttons, Vivaldi-style -->
@@ -76,18 +85,37 @@
         </form>
       </section>
 
-      <section id="panel-settings" class="panel-view">
+      <section id="panel-shield" class="panel-view">
         <h2 class="settings-heading">LMB Shield</h2>
         <div class="status-row">
           <span class="status-dot" id="shieldDot"></span>
-          <span id="shieldStatusText">Blocking ads &amp; trackers</span>
+          <span id="shieldStatusText">Balanced protection</span>
         </div>
-        <label class="checkbox-row shield-toggle">
-          <input id="shieldToggle" type="checkbox" checked>
-          Block ads &amp; trackers
-        </label>
-        <p class="hint">Built into LMB &mdash; the same EasyList &amp; EasyPrivacy filters uBlock Origin uses, applied by the browser's own native engine (no slow add-on). On by default; refreshed with each LMB update.</p>
+        <p class="hint">Built into LMB &mdash; the same filter lists uBlock Origin uses, run by the browser's own engine. Pick an overall level, then pause it on individual sites that misbehave.</p>
 
+        <h2 class="settings-heading">Protection level</h2>
+        <div class="shield-levels" id="shieldLevels">
+          <label class="shield-level"><input type="radio" name="shieldLevel" value="off">
+            <span><strong>Off</strong><small>Nothing blocked anywhere</small></span></label>
+          <label class="shield-level"><input type="radio" name="shieldLevel" value="essential">
+            <span><strong>Essential</strong><small>Blocks trackers &amp; analytics</small></span></label>
+          <label class="shield-level"><input type="radio" name="shieldLevel" value="balanced">
+            <span><strong>Balanced</strong><small>Ads + trackers &mdash; recommended</small></span></label>
+          <label class="shield-level"><input type="radio" name="shieldLevel" value="strict">
+            <span><strong>Strict</strong><small>Also cookie pop-ups &amp; floating widgets</small></span></label>
+        </div>
+
+        <h2 class="settings-heading">This site</h2>
+        <div class="status-row"><span id="shieldSiteHost" class="shield-site-host">&hellip;</span></div>
+        <label class="checkbox-row">
+          <input id="shieldSitePause" type="checkbox">
+          Pause Shield on this site
+        </label>
+        <p class="hint">Paused sites keep working even when a filter breaks them &mdash; everything else stays protected. Remembered until you unpause.</p>
+        <div class="panel-list" id="shieldExceptionList"></div>
+      </section>
+
+      <section id="panel-settings" class="panel-view">
         <h2 class="settings-heading">Update</h2>
         <div class="status-row" id="updateStatusRow">
           <span class="status-dot" id="appUpdateDot"></span>

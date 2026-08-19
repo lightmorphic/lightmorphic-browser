@@ -131,31 +131,100 @@ document.getElementById("changeSearchEngineBtn").addEventListener("click", () =>
 });
 
 // ---- LMB Shield (ad / tracker blocking) ----
-// The blocking is done by Chromium's native declarativeNetRequest engine
-// (static rulesets declared in the manifest, on by default). Here we just
-// reflect and toggle the user's on/off choice; the background worker
-// actually enables/disables the rulesets so the decision survives restart.
-const shieldToggle = document.getElementById("shieldToggle");
+// The blocking runs in the background worker (levels -> enabled rulesets,
+// per-site pauses -> session allow rules). This panel reflects and edits
+// the persisted choices; the worker re-applies them on every boot.
 const shieldDot = document.getElementById("shieldDot");
 const shieldStatusText = document.getElementById("shieldStatusText");
+const shieldLevels = document.getElementById("shieldLevels");
+const shieldSiteHost = document.getElementById("shieldSiteHost");
+const shieldSitePause = document.getElementById("shieldSitePause");
+const shieldExceptionList = document.getElementById("shieldExceptionList");
 
-function renderShield(enabled) {
-  shieldToggle.checked = enabled;
-  shieldDot.className = "status-dot " + (enabled ? "ok" : "error");
-  shieldStatusText.textContent = enabled
-    ? "Blocking ads & trackers"
-    : "Off — ads & trackers allowed";
+const SHIELD_LEVEL_LABELS = {
+  off: "Off — nothing is blocked",
+  essential: "Essential — blocking trackers",
+  balanced: "Balanced — blocking ads & trackers",
+  strict: "Strict — ads, trackers & annoyances",
+};
+
+function renderShieldLevel(level) {
+  for (const input of shieldLevels.querySelectorAll("input[name=shieldLevel]")) {
+    input.checked = input.value === level;
+  }
+  shieldDot.className = "status-dot " + (level === "off" ? "error" : "ok");
+  shieldStatusText.textContent = SHIELD_LEVEL_LABELS[level] ?? level;
 }
 
-(async () => {
-  const { shieldEnabled = true } = await chrome.storage.local.get("shieldEnabled");
-  renderShield(shieldEnabled);
-})();
+async function currentSiteHost() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  try {
+    const u = new URL(tab?.url || "");
+    return /^https?:$/.test(u.protocol) ? u.hostname : null;
+  } catch {
+    return null;
+  }
+}
 
-shieldToggle.addEventListener("change", () => {
-  const enabled = shieldToggle.checked;
-  renderShield(enabled);
-  chrome.runtime.sendMessage({ type: "lightmorphic-shield-set", enabled });
+async function renderShieldSite() {
+  const host = await currentSiteHost();
+  const { shieldSiteExceptions = [] } = await chrome.storage.local.get("shieldSiteExceptions");
+  if (host) {
+    shieldSiteHost.textContent = host;
+    shieldSitePause.disabled = false;
+    shieldSitePause.checked = shieldSiteExceptions.includes(host);
+  } else {
+    shieldSiteHost.textContent = "(no website open)";
+    shieldSitePause.disabled = true;
+    shieldSitePause.checked = false;
+  }
+  shieldExceptionList.innerHTML = "";
+  for (const h of shieldSiteExceptions) {
+    const item = document.createElement("div");
+    item.className = "panel-item";
+    const label = document.createElement("span");
+    label.textContent = `Paused: ${h}`;
+    const remove = document.createElement("button");
+    remove.textContent = "×";
+    remove.title = "Re-enable Shield on this site";
+    remove.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "lightmorphic-shield-site", host: h, paused: false });
+    });
+    item.append(label, remove);
+    shieldExceptionList.appendChild(item);
+  }
+}
+
+async function loadShield() {
+  const { shieldLevel, shieldEnabled } = await chrome.storage.local.get(["shieldLevel", "shieldEnabled"]);
+  const level = shieldLevel && SHIELD_LEVEL_LABELS[shieldLevel]
+    ? shieldLevel
+    : shieldEnabled === false ? "off" : "balanced";
+  renderShieldLevel(level);
+  await renderShieldSite();
+}
+loadShield();
+
+shieldLevels.addEventListener("change", (e) => {
+  const level = e.target?.value;
+  if (!level) return;
+  renderShieldLevel(level);
+  chrome.runtime.sendMessage({ type: "lightmorphic-shield-level", level });
+});
+
+shieldSitePause.addEventListener("change", async () => {
+  const host = await currentSiteHost();
+  if (!host) return;
+  chrome.runtime.sendMessage({ type: "lightmorphic-shield-site", host, paused: shieldSitePause.checked });
+});
+
+// Keep "This site" current as the user moves between tabs/pages, and the
+// exception list live when the worker updates it.
+chrome.tabs.onActivated.addListener(() => renderShieldSite());
+chrome.tabs.onUpdated.addListener((id, info) => { if (info.url || info.status === "complete") renderShieldSite(); });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.shieldSiteExceptions) renderShieldSite();
+  if (area === "local" && changes.shieldLevel) renderShieldLevel(changes.shieldLevel.newValue);
 });
 
 // ---- Framing pinned sites ----
@@ -411,6 +480,22 @@ function renderRailSites(webPanels) {
 async function loadWebPanels() {
   renderRailSites(await getWebPanels());
 }
+
+// Keep the rail live: if the background worker changes webPanels after
+// this page loaded (e.g. the one-time leaked-pin cleanup at boot), the
+// favicon list must reflect it without a manual reopen.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.webPanels) {
+    renderRailSites(changes.webPanels.newValue || []);
+  }
+});
+
+// Minimise: collapse the whole panel. Chromium gives extensions no way
+// to shrink the panel to rail-width, so minimise = close; the toolbar
+// icon or Ctrl+Shift+L reopens it (and it auto-opens on every launch).
+document.getElementById("railMinimize").addEventListener("click", () => {
+  window.close();
+});
 
 railAddSite.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
